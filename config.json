@@ -2,12 +2,12 @@
   "server": {
     "host": "0.0.0.0",
     "port": 5001,
-    "debug": true
+    "debug": false
   },
   "network": {
     "local_testing": false,
     "local_ip": "192.168.1.9",
-    "server_domain": "YOUR_SERVER_IP_HERE"
+    "server_domain": "privilage-walk.onrender.com"
   },
   "questions_file": "questions.json"
 } 
