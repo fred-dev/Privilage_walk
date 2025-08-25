@@ -168,6 +168,27 @@
             color: #667eea;
         }
         
+        .ranking-display {
+            background: #e7f3ff;
+            padding: 1rem;
+            border-radius: 10px;
+            margin: 1rem 0;
+            text-align: center;
+            border-left: 4px solid #007bff;
+        }
+        
+        .ranking-value {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #0056b3;
+        }
+        
+        .ranking-subtitle {
+            font-size: 0.9rem;
+            color: #0056b3;
+            margin-top: 0.5rem;
+        }
+        
         .thank-you-screen {
             display: none;
             background: white;
@@ -193,6 +214,17 @@
             color: #666;
             line-height: 1.6;
         }
+        .question-progress {
+            color: #666;
+            font-size: 1.1rem;
+        }
+        
+        .question-progress-text {
+            color: #667eea;
+            font-size: 0.9rem;
+            font-weight: 600;
+            margin-top: 0.5rem;
+        }
     </style>
 </head>
 <body>
@@ -216,10 +248,7 @@
         <div class="question-screen" id="questionScreen">
             <div class="question-header">
                 <div class="question-number" id="questionNumber">Question 1 of 12</div>
-                <div class="progress-bar">
-                    <div class="progress-fill" id="progressFill"></div>
-                </div>
-                <div class="progress-text" id="progressText">0% Complete</div>
+                <div class="question-progress-text" id="questionProgressText">Question 1 of 12</div>
             </div>
             
             <div class="question-text" id="questionText">
@@ -235,8 +264,14 @@
                 </button>
             </div>
             
+            <div class="ranking-display">
+                <div>Your Current Ranking:</div>
+                <div class="ranking-value" id="rankingValue">--</div>
+                <div class="ranking-subtitle" id="rankingSubtitle">Loading...</div>
+            </div>
+            
             <div class="position-indicator">
-                <div>Your current position:</div>
+                <div>Your accumulated score:</div>
                 <div class="position-value" id="positionValue">0</div>
             </div>
         </div>
@@ -259,6 +294,8 @@
         let currentQuestion = 0;
         let totalQuestions = 12; // Total number of privilege walk questions
         let userPosition = 0;
+        let userRanking = 0;
+        let totalUsers = 0;
         let hasAnswered = false;
         let pollInterval = null;
 
@@ -285,6 +322,7 @@
                 currentQuestion = 0;
                 showQuestionScreen();
                 loadCurrentQuestion();
+                loadRankings();
             }
             
             // Check if we need to move to next question
@@ -292,6 +330,7 @@
                 currentQuestion = data.current_question;
                 hasAnswered = false;
                 loadCurrentQuestion();
+                loadRankings();
                 enableAnswerButtons();
             }
             
@@ -313,6 +352,22 @@
             }
         }
 
+        async function loadRankings() {
+            try {
+                const response = await fetch(`/api/rankings/${sessionId}`);
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.rankings && data.rankings[username]) {
+                        userRanking = data.rankings[username].rank;
+                        totalUsers = data.rankings[username].total_users;
+                        updateRankingDisplay();
+                    }
+                }
+            } catch (error) {
+                console.error('Error loading rankings:', error);
+            }
+        }
+
         async function loadPosition() {
             try {
                 const response = await fetch(`/api/positions/${sessionId}`);
@@ -331,15 +386,27 @@
         function updateQuestionDisplay(question, questionNumber, totalQuestions) {
             const questionText = document.getElementById('questionText');
             const questionProgress = document.getElementById('questionNumber');
+            const questionProgressText = document.getElementById('questionProgressText');
             
             if (questionText) questionText.textContent = question;
             if (questionProgress) questionProgress.textContent = `Question ${questionNumber} of ${totalQuestions}`;
+            if (questionProgressText) questionProgressText.textContent = `Question ${questionNumber} of ${totalQuestions}`;
         }
 
         function updatePositionDisplay() {
             const positionElement = document.getElementById('positionValue');
             if (positionElement) {
                 positionElement.textContent = `Your current position: ${userPosition}`;
+            }
+        }
+
+        function updateRankingDisplay() {
+            const rankingElement = document.getElementById('rankingValue');
+            const rankingSubtitleElement = document.getElementById('rankingSubtitle');
+            
+            if (rankingElement && rankingSubtitleElement) {
+                rankingElement.textContent = userRanking;
+                rankingSubtitleElement.textContent = `of ${totalUsers} participants`;
             }
         }
 
@@ -395,15 +462,11 @@
                     hasAnswered = true;
                     disableAnswerButtons();
                     
-                    // Update progress bar
-                    const progressBar = document.getElementById('progressFill');
-                    if (progressBar) {
-                        const progress = ((currentQuestion + 1) / totalQuestions) * 100;
-                        progressBar.style.width = progress + '%';
-                    }
-                    
-                    // Load updated position
-                    setTimeout(loadPosition, 1000);
+                    // Load updated position and ranking
+                    setTimeout(() => {
+                        loadPosition();
+                        loadRankings();
+                    }, 1000);
                 } else {
                     alert('Error submitting answer: ' + data.error);
                 }

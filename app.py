@@ -300,7 +300,7 @@ def api_start_session():
     return jsonify({'success': True})
 
 @app.route('/api/submit_answer', methods=['POST'])
-def api_submit_answer():
+def submit_answer(session_id):
     """Submit a student's answer"""
     data = request.get_json()
     session_id = data.get('session_id')
@@ -323,15 +323,15 @@ def api_submit_answer():
     user_data = session_data['users'][username]
     user_data['answers'].append(answer)
     
-    # Update position based on answer
+    # Update accumulated position based on answer
     if answer == 'agree':
         user_data['position'] += 1
     elif answer == 'disagree':
         user_data['position'] -= 1
     
-    log_session_state(session_id, "ANSWER_SUBMITTED", f"User: {username}, Answer: {answer}, Position: {user_data['position']}")
+    log_session_state(session_id, "ANSWER_SUBMITTED", f"User: {username}, Answer: {answer}, Accumulated Position: {user_data['position']}")
     
-    # Check if all users have answered
+    # Check if all users have answered the current question
     all_answered = all(len(user['answers']) > session_data['current_question'] 
                        for user in session_data['users'].values())
     
@@ -344,10 +344,6 @@ def api_submit_answer():
             # Next question - just log it
             next_question = questions[session_data['current_question']]
             logger.info(f"Moving to next question: {session_id} | Q{session_data['current_question'] + 1}: {next_question}")
-            
-            # Reset answers for next question
-            for user in session_data['users'].values():
-                user['answers'] = user['answers'][:session_data['current_question']]
         else:
             # Session finished
             session_data['status'] = 'finished'
@@ -500,6 +496,25 @@ def advance_question(session_id):
         'total_questions': len(questions)
     })
 
+@app.route('/api/rankings/<session_id>')
+def get_rankings(session_id):
+    """Get current user rankings for a session"""
+    if session_id not in active_sessions:
+        return jsonify({'error': 'Session not found'}), 404
+    
+    session_data = active_sessions[session_id]
+    
+    if session_data['status'] != 'active':
+        return jsonify({'error': 'Session is not active'}), 400
+    
+    rankings = calculate_user_rankings(session_data)
+    
+    return jsonify({
+        'rankings': rankings,
+        'current_question': session_data['current_question'],
+        'total_questions': len(session_data['questions'])
+    })
+
 @app.route('/health')
 def health_check():
     """Health check endpoint for Render"""
@@ -551,6 +566,25 @@ def load_questions():
             "I grew up in a family that was financially secure and could afford most of what we needed.",
             "I have always had secure housing and have never been at risk of homelessness."
         ]
+
+def calculate_user_rankings(session_data):
+    """Calculate user rankings based on accumulated scores (highest score = rank 1)"""
+    users = session_data['users']
+    if not users:
+        return {}
+    
+    # Sort users by position (highest first for rank 1)
+    sorted_users = sorted(users.items(), key=lambda x: x[1]['position'], reverse=True)
+    
+    rankings = {}
+    for rank, (username, user_data) in enumerate(sorted_users, 1):
+        rankings[username] = {
+            'rank': rank,
+            'position': user_data['position'],
+            'total_users': len(users)
+        }
+    
+    return rankings
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5001))

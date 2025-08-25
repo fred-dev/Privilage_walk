@@ -370,6 +370,24 @@
             margin: 2rem 0;
         }
         
+        .score-scale {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: rgba(255, 255, 255, 0.9);
+            padding: 1rem;
+            border-radius: 8px;
+            font-size: 0.8rem;
+            color: #666;
+            text-align: center;
+        }
+        
+        .score-scale .score {
+            margin: 0.5rem 0;
+            font-weight: 600;
+        }
+        
         .user-marker {
             position: absolute;
             background: #667eea;
@@ -592,6 +610,11 @@
         
         <div class="walk-container" id="walkContainer">
             <!-- User markers will be dynamically added here -->
+            <div class="score-scale">
+                <div class="score">-12</div>
+                <div class="score">0</div>
+                <div class="score">+12</div>
+            </div>
         </div>
     </div>
     
@@ -977,9 +1000,10 @@
             Object.keys(positions).forEach(username => {
                 const marker = document.getElementById(`marker-${username}`);
                 if (marker) {
-                    // Convert position to screen coordinates
-                    // Position ranges from -100 to +100, convert to 0-600px
-                    const screenY = 300 - (positions[username] * 3); // 300 is center, 3 is scale factor
+                    // Convert accumulated position to screen coordinates
+                    // Position ranges from -12 to +12, convert to 0-600px
+                    // Center at 300px, scale so -12 = 0px, +12 = 600px
+                    const screenY = 300 - (positions[username] * 25); // 300 is center, 25px per point
                     marker.style.top = `${Math.max(0, Math.min(540, screenY))}px`;
                     
                     // Update answer status
