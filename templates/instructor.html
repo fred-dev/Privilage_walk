@@ -751,20 +751,26 @@
                 const response = await fetch(`/api/session_status/${sessionId}`);
                 if (response.ok) {
                     const data = await response.json();
+                    currentQuestion = data.current_question;
+                    totalQuestions = data.total_questions;
+                    
+                    // Get the actual question text from the questions endpoint
                     if (data.status === 'active') {
-                        currentQuestion = data.current_question;
-                        totalQuestions = data.questions.length;
-                        questionText = data.questions[currentQuestion];
-                        
-                        // Update question display
-                        const questionDisplay = document.getElementById('questionDisplay');
-                        if (questionDisplay) {
-                            questionDisplay.textContent = questionText;
+                        const questionResponse = await fetch(`/api/question/${sessionId}`);
+                        if (questionResponse.ok) {
+                            const questionData = await questionResponse.json();
+                            questionText = questionData.question;
+                            
+                            // Update question display
+                            const questionDisplay = document.getElementById('questionDisplay');
+                            if (questionDisplay) {
+                                questionDisplay.textContent = questionText;
+                            }
                         }
-                        
-                        // Update question progress
-                        updateQuestionProgress();
                     }
+                    
+                    // Update question progress
+                    updateQuestionProgress();
                 }
             } catch (error) {
                 console.error('Error loading current question:', error);
