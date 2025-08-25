@@ -226,6 +226,56 @@
             border-left: 4px solid #667eea;
         }
         
+        .user-count-display {
+            background: #e7f3ff;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            border-left: 4px solid #007bff;
+            text-align: center;
+        }
+        
+        .total-users {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: #0056b3;
+        }
+        
+        .question-progress-display {
+            background: #fff3cd;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            border-left: 4px solid #ffc107;
+        }
+        
+        .question-progress-display h3 {
+            margin: 0 0 0.5rem 0;
+            color: #856404;
+            font-size: 1rem;
+        }
+        
+        .current-question {
+            font-weight: 600;
+            color: #856404;
+            margin-bottom: 0.5rem;
+        }
+        
+        .answered-status {
+            font-size: 0.9rem;
+            color: #856404;
+        }
+        
+        .user-item.answered {
+            border-left-color: #28a745;
+            background: #d4edda;
+        }
+        
+        .user-item.pending {
+            border-left-color: #ffc107;
+            background: #fff3cd;
+        }
+        
         .privilege-walk-view {
             display: none;
             max-width: 1200px;
@@ -294,7 +344,17 @@
             text-align: center;
             min-width: 120px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.2);
-            transition: top 0.5s ease;
+            transition: all 0.5s ease;
+            font-size: 0.9rem;
+        }
+        
+        .user-marker.answered {
+            background: #28a745;
+        }
+        
+        .user-marker.pending {
+            background: #ffc107;
+            color: #333;
         }
         
         .final-results {
@@ -466,6 +526,14 @@
         
         <div class="right-panel">
             <h2>👥 Connected Students</h2>
+            <div class="user-count-display">
+                <div class="total-users">Total: <span id="totalUserCount">0</span></div>
+            </div>
+            <div class="question-progress-display" id="questionProgressDisplay" style="display: none;">
+                <h3>📝 Question Progress</h3>
+                <div class="current-question" id="currentQuestionDisplay"></div>
+                <div class="answered-status" id="answeredStatusDisplay"></div>
+            </div>
             <div class="user-list" id="userList">
                 <p style="text-align: center; color: #666;">No students joined yet</p>
             </div>
@@ -517,6 +585,10 @@
         let users = {};
         let sessionStatus = 'waiting';
         let pollInterval = null;
+        let currentQuestion = 0;
+        let totalQuestions = 0;
+        let questionText = '';
+        let userAnswers = {};
 
         function startPolling() {
             // Poll every 2 seconds for updates
@@ -560,6 +632,20 @@
                     loadFinalResults();
                 }
             }
+            
+            // Update question progress
+            if (data.current_question !== undefined && data.current_question !== currentQuestion) {
+                currentQuestion = data.current_question;
+                totalQuestions = data.total_questions;
+                loadCurrentQuestion();
+                updateQuestionProgress();
+            }
+            
+            // Load user positions and answers
+            if (sessionStatus === 'active') {
+                loadUserPositions();
+                loadUserAnswers();
+            }
         }
 
         async function loadCurrentQuestion() {
@@ -567,10 +653,95 @@
                 const response = await fetch(`/api/question/${sessionId}`);
                 if (response.ok) {
                     const data = await response.json();
+                    questionText = data.question;
                     updateQuestionDisplay(data.question, data.question_number, data.total_questions);
                 }
             } catch (error) {
                 console.error('Error loading question:', error);
+            }
+        }
+
+        async function loadUserPositions() {
+            try {
+                const response = await fetch(`/api/positions/${sessionId}`);
+                if (response.ok) {
+                    const data = await response.json();
+                    updateUserPositions(data.positions);
+                }
+            } catch (error) {
+                console.error('Error loading positions:', error);
+            }
+        }
+
+        async function loadUserAnswers() {
+            try {
+                // Get current user answer status from the dedicated endpoint
+                const response = await fetch(`/api/user_answers/${sessionId}`);
+                if (response.ok) {
+                    const data = await response.json();
+                    
+                    // Update user answers based on the API response
+                    userAnswers = {};
+                    if (data.user_answers) {
+                        Object.keys(data.user_answers).forEach(username => {
+                            userAnswers[username] = data.user_answers[username].answered;
+                        });
+                    }
+                    
+                    updateUserAnswerStatus(data);
+                }
+            } catch (error) {
+                console.error('Error loading user answers:', error);
+            }
+        }
+
+        function updateUserAnswerStatus(data) {
+            // Initialize user answers for current question
+            Object.keys(users).forEach(username => {
+                if (!(username in userAnswers)) {
+                    userAnswers[username] = false;
+                }
+            });
+            
+            // Check if we need to update answer status based on question progress
+            if (data.current_question !== undefined && data.current_question !== currentQuestion) {
+                // New question started, reset all answers
+                Object.keys(userAnswers).forEach(username => {
+                    userAnswers[username] = false;
+                });
+            }
+            
+            // Update question progress display
+            updateQuestionProgress();
+            updateUserList();
+            
+            // Update markers if privilege walk view is active
+            if (document.getElementById('privilegeWalkView').style.display !== 'none') {
+                createUserMarkers();
+            }
+        }
+
+        function updateQuestionProgress() {
+            const questionProgressDisplay = document.getElementById('questionProgressDisplay');
+            const currentQuestionDisplay = document.getElementById('currentQuestionDisplay');
+            const answeredStatusDisplay = document.getElementById('answeredStatusDisplay');
+            
+            if (questionProgressDisplay && currentQuestionDisplay && answeredStatusDisplay) {
+                questionProgressDisplay.style.display = 'block';
+                currentQuestionDisplay.textContent = `Question ${currentQuestion + 1} of ${totalQuestions}: ${questionText}`;
+                
+                // Count answered vs pending users
+                const answeredCount = Object.values(userAnswers).filter(answered => answered).length;
+                const totalUsers = Object.keys(users).length;
+                const pendingCount = totalUsers - answeredCount;
+                
+                answeredStatusDisplay.innerHTML = `
+                    <div>✅ Answered: ${answeredCount}/${totalUsers}</div>
+                    <div>⏳ Pending: ${pendingCount}/${totalUsers}</div>
+                `;
+                
+                // Update user list to reflect current answer status
+                updateUserList();
             }
         }
 
@@ -615,9 +786,19 @@
                 if (Object.keys(users).length === 0) {
                     userListElement.innerHTML = '<p style="text-align: center; color: #666;">No students joined yet</p>';
                 } else {
-                    userListElement.innerHTML = Object.keys(users).map(username => 
-                        `<div class="user-item">👤 ${username}</div>`
-                    ).join('');
+                    userListElement.innerHTML = Object.keys(users).map(username => {
+                        const hasAnswered = userAnswers[username] || false;
+                        const statusClass = hasAnswered ? 'answered' : 'pending';
+                        const statusIcon = hasAnswered ? '✅' : '⏳';
+                        const statusText = hasAnswered ? 'Answered' : 'Pending';
+                        
+                        return `<div class="user-item ${statusClass}">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <span>👤 ${username}</span>
+                                <span style="font-size: 0.9rem; color: #666;">${statusIcon} ${statusText}</span>
+                            </div>
+                        </div>`;
+                    }).join('');
                 }
             }
         }
@@ -704,7 +885,18 @@
         function createUserMarkers() {
             const container = document.getElementById('walkContainer');
             const userCount = Object.keys(users).length;
-            const sectionWidth = 100 / userCount;
+            
+            if (userCount === 0) return;
+            
+            // Calculate dynamic spacing based on user count
+            let sectionWidth;
+            if (userCount <= 2) {
+                sectionWidth = 100 / userCount; // 50% each for 2 users
+            } else if (userCount <= 10) {
+                sectionWidth = 80 / userCount; // 80% of width, some spacing
+            } else {
+                sectionWidth = 60 / userCount; // 60% of width, more spacing
+            }
             
             container.innerHTML = '';
             
@@ -713,8 +905,16 @@
                 marker.className = 'user-marker';
                 marker.id = `marker-${username}`;
                 marker.textContent = username;
-                marker.style.left = `${(index * sectionWidth) + (sectionWidth / 2) - 60}px`;
+                
+                // Calculate horizontal position with dynamic spacing
+                const leftPosition = (index * sectionWidth) + (sectionWidth / 2) - 60;
+                marker.style.left = `${Math.max(10, Math.min(container.offsetWidth - 130, leftPosition))}px`;
                 marker.style.top = '270px'; // Center vertically
+                
+                // Set initial answer status
+                const hasAnswered = userAnswers[username] || false;
+                marker.classList.add(hasAnswered ? 'answered' : 'pending');
+                
                 container.appendChild(marker);
             });
         }
@@ -727,8 +927,15 @@
                     // Position ranges from -100 to +100, convert to 0-600px
                     const screenY = 300 - (positions[username] * 3); // 300 is center, 3 is scale factor
                     marker.style.top = `${Math.max(0, Math.min(540, screenY))}px`;
+                    
+                    // Update answer status
+                    const hasAnswered = userAnswers[username] || false;
+                    marker.className = `user-marker ${hasAnswered ? 'answered' : 'pending'}`;
                 }
             });
+            
+            // Update user list to reflect answer status
+            updateUserList();
         }
 
         function createNewSession() {

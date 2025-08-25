@@ -435,6 +435,31 @@ def get_positions(session_id):
     
     return jsonify({'positions': positions})
 
+@app.route('/api/user_answers/<session_id>')
+def get_user_answers(session_id):
+    """Get current user answer status for the current question"""
+    if session_id not in active_sessions:
+        return jsonify({'error': 'Session not found'}), 404
+    
+    session_data = active_sessions[session_id]
+    current_q = session_data['current_question']
+    
+    user_answers = {}
+    for username, user_data in session_data['users'].items():
+        # User has answered if they have more answers than current question
+        has_answered = len(user_data.get('answers', [])) > current_q
+        user_answers[username] = {
+            'answered': has_answered,
+            'answer_count': len(user_data.get('answers', [])),
+            'current_question': current_q
+        }
+    
+    return jsonify({
+        'user_answers': user_answers,
+        'current_question': current_q,
+        'total_questions': len(session_data['questions'])
+    })
+
 @app.route('/health')
 def health_check():
     """Health check endpoint for Render"""
