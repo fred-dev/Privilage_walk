@@ -111,35 +111,44 @@
         }
         
         .qr-code {
-            margin: 1rem 0;
+            margin: 2rem 0;
+            padding: 2rem;
+            border: 2px dashed #ddd;
+            border-radius: 10px;
+            text-align: center;
+        }
+        
+        .qr-code img {
+            max-width: 300px;
+            height: auto;
+            margin-bottom: 1rem;
         }
         
         .qr-controls {
-            margin: 1rem 0;
+            margin-top: 1rem;
         }
         
         .refresh-btn {
-            background: #667eea;
+            background: #007bff;
             color: white;
             border: none;
-            padding: 0.75rem 1.5rem;
-            border-radius: 8px;
+            padding: 0.5rem 1rem;
+            border-radius: 5px;
             cursor: pointer;
-            font-size: 1rem;
+            font-size: 0.9rem;
         }
         
         .refresh-btn:hover {
-            background: #5a6fd8;
+            background: #0056b3;
         }
         
-        .join-url {
+        .url-display {
             background: #f8f9fa;
-            padding: 1rem;
-            border-radius: 8px;
+            padding: 0.75rem;
+            border-radius: 5px;
             font-family: monospace;
             font-size: 0.9rem;
-            color: #666;
-            margin: 1rem 0;
+            margin: 0.5rem 0;
             word-break: break-all;
         }
         
@@ -594,12 +603,15 @@
                 </div>
                 
                 <div class="qr-code" id="qrCode">
-                    <!-- QR code will be generated here -->
+                    <img id="qrCodeImage" src="/qr/{{ session_id }}" alt="QR Code for joining session" style="max-width: 300px; height: auto;">
+                    <div class="qr-controls">
+                        <button onclick="refreshQRCode()" class="refresh-btn">🔄 Refresh QR Code</button>
+                    </div>
                 </div>
                 
                 <div class="join-url">
                     <p><strong>Join URL:</strong></p>
-                    <div class="url-display" id="joinUrl">Loading...</div>
+                    <div class="url-display" id="joinUrl">http://{{ network_ip }}:5001/join/{{ session_id }}</div>
                     <button class="copy-btn" onclick="copyJoinURL()">📋 Copy URL</button>
                 </div>
             </div>
@@ -706,44 +718,32 @@
         function handleStatusUpdate(data) {
             console.log('Status update received:', data);
             
-            // Update user count and list
-            if (data.users) {
-                users = {};
-                data.users.forEach(username => {
-                    users[username] = { joined_at: new Date() };
-                });
-                updateUserCount();
-                updateUserList();
-                updateGoButton();
-            }
-            
             // Update session status
-            if (data.status && data.status !== sessionStatus) {
-                sessionStatus = data.status;
-                updateStatus();
-                
-                if (sessionStatus === 'active') {
-                    showPrivilegeWalkView();
-                    loadCurrentQuestion();
-                    createUserMarkers();
-                } else if (sessionStatus === 'finished') {
-                    loadFinalResults();
-                }
-            }
-            
-            // Update question progress
-            if (data.current_question !== undefined && data.current_question !== currentQuestion) {
-                currentQuestion = data.current_question;
-                totalQuestions = data.total_questions;
+            if (data.status === 'waiting') {
+                showMainView();
+            } else if (data.status === 'active') {
+                showPrivilegeWalkView();
                 loadCurrentQuestion();
                 updateQuestionProgress();
-            }
-            
-            // Load user positions and answers
-            if (sessionStatus === 'active') {
                 loadUserPositions();
                 loadUserAnswers();
+                createUserMarkers();
+            } else if (data.status === 'finished') {
+                showFinishedView();
             }
+            
+            // Update user count and list
+            userCount = data.user_count || 0;
+            users = data.users || [];
+            
+            // Update user count display
+            const userCountDisplay = document.getElementById('totalUserCount');
+            if (userCountDisplay) {
+                userCountDisplay.textContent = userCount;
+            }
+            
+            // Update user list
+            updateUserList();
         }
 
         async function loadCurrentQuestion() {
@@ -802,6 +802,54 @@
                 }
             } catch (error) {
                 console.error('Error loading user answers:', error);
+            }
+        }
+
+        async function loadUserCount() {
+            try {
+                const response = await fetch(`/api/session_status/${sessionId}`);
+                if (response.ok) {
+                    const data = await response.json();
+                    userCount = data.user_count;
+                    users = data.users;
+                    
+                    // Update user count display
+                    const userCountDisplay = document.getElementById('totalUserCount');
+                    if (userCountDisplay) {
+                        userCountDisplay.textContent = userCount;
+                    }
+                    
+                    // Update user list
+                    updateUserList();
+                }
+            } catch (error) {
+                console.error('Error loading user count:', error);
+            }
+        }
+        
+        function updateUserList() {
+            const userList = document.getElementById('userList');
+            if (userList) {
+                if (userCount === 0) {
+                    userList.innerHTML = '<p>No students joined yet</p>';
+                } else {
+                    let userListHTML = '';
+                    for (const username of users) {
+                        const hasAnswered = userAnswers[username] || false;
+                        const statusClass = hasAnswered ? 'answered' : 'pending';
+                        const statusIcon = hasAnswered ? '✅' : '⏳';
+                        const statusText = hasAnswered ? 'Answered' : 'Pending';
+                        
+                        userListHTML += `
+                            <div class="user-item ${statusClass}">
+                                <span class="user-icon">👤</span>
+                                <span class="username">${username}</span>
+                                <span class="status">${statusIcon} ${statusText}</span>
+                            </div>
+                        `;
+                    }
+                    userList.innerHTML = userListHTML;
+                }
             }
         }
 
@@ -902,29 +950,6 @@
             const userCountElement = document.getElementById('userCount');
             if (userCountElement) {
                 userCountElement.textContent = Object.keys(users).length;
-            }
-        }
-
-        function updateUserList() {
-            const userListElement = document.getElementById('userList');
-            if (userListElement) {
-                if (Object.keys(users).length === 0) {
-                    userListElement.innerHTML = '<p style="text-align: center; color: #666;">No students joined yet</p>';
-                } else {
-                    userListElement.innerHTML = Object.keys(users).map(username => {
-                        const hasAnswered = userAnswers[username] || false;
-                        const statusClass = hasAnswered ? 'answered' : 'pending';
-                        const statusIcon = hasAnswered ? '✅' : '⏳';
-                        const statusText = hasAnswered ? 'Answered' : 'Pending';
-                        
-                        return `<div class="user-item ${statusClass}">
-                            <div style="display: flex; justify-content: space-between; align-items: center;">
-                                <span>👤 ${username}</span>
-                                <span style="font-size: 0.9rem; color: #666;">${statusIcon} ${statusText}</span>
-                            </div>
-                        </div>`;
-                    }).join('');
-                }
             }
         }
 
@@ -1201,9 +1226,39 @@
             loadUserAnswers();
             createUserMarkers();
         }
+        
+        function refreshQRCode() {
+            const qrImage = document.getElementById('qrCodeImage');
+            if (qrImage) {
+                qrImage.src = `/qr/${sessionId}?t=${Date.now()}`;
+            }
+        }
+        
+        function copyJoinURL() {
+            const joinURL = `http://${networkIp}:5001/join/${sessionId}`;
+            navigator.clipboard.writeText(joinURL).then(() => {
+                alert('Join URL copied to clipboard!');
+            }).catch(() => {
+                // Fallback for older browsers
+                const textArea = document.createElement('textarea');
+                textArea.value = joinURL;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                alert('Join URL copied to clipboard!');
+            });
+        }
 
         // Start polling when page loads
         document.addEventListener('DOMContentLoaded', function() {
+            console.log('Instructor page loaded, starting polling...');
+            
+            // Load initial data
+            loadUserCount();
+            loadCurrentQuestion();
+            
+            // Start polling for updates
             startPolling();
         });
 
