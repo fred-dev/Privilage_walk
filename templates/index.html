@@ -17,126 +17,107 @@
         }
         
         .container {
-            background: white;
-            padding: 3rem;
-            border-radius: 20px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 2rem;
             text-align: center;
-            max-width: 500px;
-            width: 90%;
         }
         
-        h1 {
-            color: #333;
+        .hero {
+            margin-bottom: 3rem;
+        }
+        
+        .hero h1 {
+            font-size: 3rem;
+            color: #2c3e50;
+            margin-bottom: 1rem;
+        }
+        
+        .hero p {
+            font-size: 1.2rem;
+            color: #7f8c8d;
             margin-bottom: 2rem;
-            font-size: 2.5rem;
         }
         
-        .form-group {
-            margin-bottom: 2rem;
-            text-align: left;
-        }
-        
-        label {
-            display: block;
-            margin-bottom: 0.5rem;
-            color: #555;
-            font-weight: 600;
-        }
-        
-        input[type="text"] {
-            width: 100%;
-            padding: 1rem;
-            border: 2px solid #e1e5e9;
-            border-radius: 10px;
-            font-size: 1rem;
-            transition: border-color 0.3s ease;
-            box-sizing: border-box;
-        }
-        
-        input[type="text"]:focus {
-            outline: none;
-            border-color: #667eea;
-        }
-        
-        button {
+        .cta-button {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
             border: none;
             padding: 1rem 2rem;
-            border-radius: 10px;
-            font-size: 1.1rem;
-            font-weight: 600;
+            font-size: 1.2rem;
+            border-radius: 50px;
             cursor: pointer;
-            transition: transform 0.2s ease;
-            width: 100%;
+            transition: all 0.3s ease;
+            font-weight: 600;
         }
         
-        button:hover {
+        .cta-button:hover {
             transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.3);
         }
         
-        .description {
-            color: #666;
-            margin-bottom: 2rem;
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 2rem;
+            margin-top: 3rem;
+        }
+        
+        .feature {
+            background: white;
+            padding: 2rem;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease;
+        }
+        
+        .feature:hover {
+            transform: translateY(-5px);
+        }
+        
+        .feature h3 {
+            color: #2c3e50;
+            margin-bottom: 1rem;
+        }
+        
+        .feature p {
+            color: #7f8c8d;
             line-height: 1.6;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>🚶‍♂️ Privilege Walk</h1>
-        <p class="description">
-            Create a new session for your students to participate in the privilege walk activity. 
-            Each session will have a unique QR code that students can scan to join.
-        </p>
+        <div class="hero">
+            <h1>🏃‍♂️ Privilege Walk</h1>
+            <p>Create an interactive session to explore privilege and social justice</p>
+            <button class="cta-button" onclick="createSession()">🚀 Start New Session</button>
+        </div>
         
-        <form id="createSessionForm">
-            <div class="form-group">
-                <label for="sessionName">Session Name:</label>
-                <input type="text" id="sessionName" name="sessionName" 
-                       placeholder="e.g., Sociology 101 - Section A" required>
+        <div class="features">
+            <div class="feature">
+                <h3>📱 Easy Setup</h3>
+                <p>Generate a QR code for students to scan and join instantly</p>
             </div>
-            
-            <button type="submit">Create New Session</button>
-        </form>
+            <div class="feature">
+                <h3>🎯 Interactive Questions</h3>
+                <p>12 thought-provoking questions about privilege and identity</p>
+            </div>
+            <div class="feature">
+                <h3>📊 Real-time Visualization</h3>
+                <p>See privilege levels accumulate as students answer questions</p>
+            </div>
+        </div>
     </div>
 
     <script>
-        document.getElementById('createSessionForm').addEventListener('submit', async function(e) {
-            e.preventDefault();
+        function createSession() {
+            // Generate a random session ID
+            const sessionId = Math.random().toString(36).substring(2, 15);
             
-            const sessionName = document.getElementById('sessionName').value;
-            const button = document.querySelector('button');
-            const originalText = button.textContent;
-            
-            button.textContent = 'Creating...';
-            button.disabled = true;
-            
-            try {
-                const response = await fetch('/create_session', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded',
-                    },
-                    body: `session_name=${encodeURIComponent(sessionName)}`
-                });
-                
-                const data = await response.json();
-                
-                if (data.session_id) {
-                    window.location.href = `/instructor/${data.session_id}`;
-                } else {
-                    alert('Error creating session');
-                }
-            } catch (error) {
-                console.error('Error:', error);
-                alert('Error creating session');
-            } finally {
-                button.textContent = originalText;
-                button.disabled = false;
-            }
-        });
+            // Redirect to instructor view with the new session
+            window.location.href = `/instructor/${sessionId}`;
+        }
     </script>
 </body>
 </html> 

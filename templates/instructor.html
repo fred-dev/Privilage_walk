@@ -487,12 +487,37 @@
             background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
             color: white;
         }
+        .header-actions {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+        
+        .resume-btn {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+        
+        .resume-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(40, 167, 69, 0.3);
+        }
     </style>
 </head>
 <body>
     <div class="header">
-        <h1 class="session-name">{{ session_name }}</h1>
-        <p class="session-id">Session ID: {{ session_id }}</p>
+        <h1>🏃‍♂️ Privilege Walk Session</h1>
+        <p>Session ID: <code>{{ session_id }}</code></p>
+        <div class="header-actions">
+            <button class="resume-btn" onclick="resumeSession()">🔄 Resume Session</button>
+            <a href="/" class="btn">🏠 Back to Home</a>
+        </div>
     </div>
     
     <div class="main-content">
@@ -644,13 +669,12 @@
         const sessionId = '{{ session_id }}';
         const networkIp = '{{ network_ip }}';
         
-        let users = {};
-        let sessionStatus = 'waiting';
-        let pollInterval = null;
         let currentQuestion = 0;
         let totalQuestions = 0;
         let questionText = '';
+        let users = {};
         let userAnswers = {};
+        let userCount = 0;
 
         function startPolling() {
             // Poll every 2 seconds for updates
@@ -712,14 +736,26 @@
 
         async function loadCurrentQuestion() {
             try {
-                const response = await fetch(`/api/question/${sessionId}`);
+                const response = await fetch(`/api/session_status/${sessionId}`);
                 if (response.ok) {
                     const data = await response.json();
-                    questionText = data.question;
-                    updateQuestionDisplay(data.question, data.question_number, data.total_questions);
+                    if (data.status === 'active') {
+                        currentQuestion = data.current_question;
+                        totalQuestions = data.questions.length;
+                        questionText = data.questions[currentQuestion];
+                        
+                        // Update question display
+                        const questionDisplay = document.getElementById('questionDisplay');
+                        if (questionDisplay) {
+                            questionDisplay.textContent = questionText;
+                        }
+                        
+                        // Update question progress
+                        updateQuestionProgress();
+                    }
                 }
             } catch (error) {
-                console.error('Error loading question:', error);
+                console.error('Error loading current question:', error);
             }
         }
 
@@ -1143,6 +1179,15 @@
                 console.error('Error advancing question:', error);
                 alert('Error advancing question');
             }
+        }
+        
+        function resumeSession() {
+            // Reload all session data
+            loadCurrentQuestion();
+            updateQuestionProgress();
+            loadUserPositions();
+            loadUserAnswers();
+            createUserMarkers();
         }
 
         // Start polling when page loads
