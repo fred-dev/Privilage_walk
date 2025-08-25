@@ -508,12 +508,70 @@
             transform: translateY(-2px);
             box-shadow: 0 5px 15px rgba(40, 167, 69, 0.3);
         }
+        .copy-btn {
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 0.5rem;
+            font-size: 0.9rem;
+        }
+        
+        .copy-btn:hover {
+            background: #218838;
+        }
+        
+        .session-controls {
+            margin: 2rem 0;
+        }
+        
+        .start-btn, .stop-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 1rem 2rem;
+            border-radius: 10px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            margin: 0.5rem;
+            transition: transform 0.2s ease;
+        }
+        
+        .start-btn:hover, .stop-btn:hover {
+            transform: translateY(-2px);
+        }
+        
+        .stop-btn {
+            background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+        }
+        
+        .question-display {
+            margin-top: 2rem;
+            padding: 1.5rem;
+            background: #f8f9fa;
+            border-radius: 10px;
+            border-left: 4px solid #667eea;
+        }
+        
+        .question-display h3 {
+            margin: 0 0 1rem 0;
+            color: #333;
+        }
+        
+        .question-text {
+            color: #666;
+            line-height: 1.6;
+            font-style: italic;
+        }
     </style>
 </head>
 <body>
     <div class="header">
-        <h1>🏃‍♂️ Privilege Walk Session</h1>
-        <p>Session ID: <code>{{ session_id }}</code></p>
+        <h1 class="session-name">Privilege Walk Session</h1>
+        <p class="session-id">Session ID: {{ session_id }}</p>
         <div class="header-actions">
             <button class="resume-btn" onclick="resumeSession()">🔄 Resume Session</button>
             <a href="/" class="btn">🏠 Back to Home</a>
@@ -522,30 +580,11 @@
     
     <div class="main-content">
         <div class="left-panel">
-            <h2>📱 Student Join</h2>
-            
-            {% if network_ip %}
-            <div class="network-info">
-                <h3>🌐 Network Information</h3>
-                <p><strong>Your computer's IP address:</strong></p>
-                <div class="ip-address">{{ network_ip }}</div>
-                <p class="ip-note">Students must be on the same network to connect</p>
-                
-                <div style="margin-top: 1rem; padding: 1rem; background: #e7f3ff; border-radius: 8px; border-left: 4px solid #007bff;">
-                    <h4 style="margin: 0 0 0.5rem 0; color: #0056b3;">🔧 Troubleshooting Tips</h4>
-                    <ul style="margin: 0; padding-left: 1.2rem; font-size: 0.9rem; color: #0056b3;">
-                        <li>Make sure students are connected to the same WiFi network</li>
-                        <li>If students can't connect, try refreshing the IP address</li>
-                        <li>Some corporate networks may block local connections</li>
-                        <li>Test the QR code with your own phone first</li>
-                    </ul>
-                </div>
-            </div>
-            {% endif %}
+            <h2>📱 Student Join Instructions</h2>
             
             <div class="qr-container">
                 <div class="qr-instructions">
-                    <h3>📱 How Students Join</h3>
+                    <h3>How Students Join:</h3>
                     <ol>
                         <li>Students scan this QR code with their phone camera</li>
                         <li>They'll be taken to a join page</li>
@@ -553,53 +592,26 @@
                         <li>They'll see "Please wait" until you start</li>
                     </ol>
                 </div>
-                <div class="qr-code">
-                    <img id="qrCodeImage" src="/qr/{{ session_id }}" alt="QR Code for joining session" style="max-width: 300px; height: auto;">
-                    <div class="qr-controls">
-                        <button onclick="refreshQRCode()" class="refresh-btn">🔄 Refresh QR Code</button>
-                    </div>
+                
+                <div class="qr-code" id="qrCode">
+                    <!-- QR code will be generated here -->
                 </div>
-                <div class="join-url">http://{{ network_ip }}:5001/join/{{ session_id }}</div>
-                <div class="debug-info">
-                    <small>Debug: QR code points to: <code>http://{{ network_ip }}:5001/join/{{ session_id }}</code></small>
-                    <br><small>💡 The QR code automatically uses your network IP address so students can connect!</small>
-                    <div style="margin-top: 0.5rem;">
-                        <button onclick="refreshIPAddress()" style="margin-right: 0.5rem; padding: 0.25rem 0.5rem; background: #007bff; color: white; border: none; border-radius: 4px; font-size: 0.8rem;">
-                            🔄 Refresh IP
-                        </button>
-                        <button onclick="copyJoinURL()" style="padding: 0.25rem 0.5rem; background: #28a745; color: white; border: none; border-radius: 4px; font-size: 0.8rem;">
-                            📋 Copy URL
-                        </button>
-                    </div>
+                
+                <div class="join-url">
+                    <p><strong>Join URL:</strong></p>
+                    <div class="url-display" id="joinUrl">Loading...</div>
+                    <button class="copy-btn" onclick="copyJoinURL()">📋 Copy URL</button>
                 </div>
             </div>
             
-            <div class="status waiting" id="status">
-                Waiting for students to join...
+            <div class="session-controls">
+                <button class="start-btn" id="startBtn" onclick="startSession()">🚀 Start Session</button>
+                <button class="stop-btn" id="stopBtn" onclick="stopSession()" style="display: none;">⏹️ Stop Session</button>
             </div>
             
-            <div class="testing-note">
-                <p><strong>💡 Testing Tip:</strong> Test the QR code with your own phone first to make sure it works!</p>
-            </div>
-            
-            <div class="user-count" id="userCount">0</div>
-            <p>Students joined</p>
-            
-            <button class="go-button" id="goButton" disabled>
-                🚀 Start Privilege Walk
-            </button>
-            
-            <div class="debug-controls" style="margin-top: 1rem; padding: 1rem; background: #f8f9fa; border-radius: 8px;">
-                <p><strong>🐛 Debug Controls:</strong></p>
-                <button onclick="testViewTransition()" style="margin: 0.5rem; padding: 0.5rem; background: #007bff; color: white; border: none; border-radius: 4px;">
-                    Test View Transition
-                </button>
-                <button onclick="showPrivilegeWalkView()" style="margin: 0.5rem; padding: 0.5rem; background: #28a745; color: white; border: none; border-radius: 4px;">
-                    Force Show Walk View
-                </button>
-                <button onclick="showMainView()" style="margin: 0.5rem; padding: 0.5rem; background: #6c757d; color: white; border: none; border-radius: 4px;">
-                    Force Show Main View
-                </button>
+            <div class="question-display">
+                <h3>Current Question:</h3>
+                <div class="question-text" id="questionDisplay">Session not started yet</div>
             </div>
         </div>
         
