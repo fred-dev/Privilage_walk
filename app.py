@@ -53,6 +53,45 @@ def load_questions():
 # Store active sessions
 active_sessions = {}
 
+def save_sessions():
+    """Save sessions to disk"""
+    try:
+        with open('sessions.json', 'w') as f:
+            # Convert datetime objects to strings for JSON serialization
+            sessions_to_save = {}
+            for session_id, session_data in active_sessions.items():
+                sessions_to_save[session_id] = session_data.copy()
+                if 'created_at' in sessions_to_save[session_id]:
+                    sessions_to_save[session_id]['created_at'] = sessions_to_save[session_id]['created_at'].isoformat()
+                for username, user_data in sessions_to_save[session_id].get('users', {}).items():
+                    if 'joined_at' in user_data:
+                        user_data['joined_at'] = user_data['joined_at'].isoformat()
+            json.dump(sessions_to_save, f, indent=2)
+    except Exception as e:
+        print(f"Error saving sessions: {e}")
+
+def load_sessions():
+    """Load sessions from disk"""
+    try:
+        with open('sessions.json', 'r') as f:
+            sessions_data = json.load(f)
+            for session_id, session_data in sessions_data.items():
+                # Convert string dates back to datetime objects
+                if 'created_at' in session_data:
+                    session_data['created_at'] = datetime.fromisoformat(session_data['created_at'])
+                for username, user_data in session_data.get('users', {}).items():
+                    if 'joined_at' in user_data:
+                        user_data['joined_at'] = datetime.fromisoformat(user_data['joined_at'])
+            return sessions_data
+    except FileNotFoundError:
+        return {}
+    except Exception as e:
+        print(f"Error loading sessions: {e}")
+        return {}
+
+# Load existing sessions on startup
+active_sessions = load_sessions()
+
 def get_network_ip():
     """Get the local network IP address"""
     try:
@@ -92,6 +131,9 @@ def create_session():
         'user_answers': {},
         'created_at': datetime.now()
     }
+    
+    # Save sessions to disk
+    save_sessions()
     
     return jsonify({'session_id': session_id, 'redirect_url': f'/instructor/{session_id}'})
 
@@ -209,6 +251,9 @@ def api_join_session():
         'answers': []
     }
     
+    # Save sessions to disk
+    save_sessions()
+    
     # Notify instructor view
     socketio.emit('user_joined', {
         'username': username,
@@ -239,6 +284,9 @@ def api_start_session():
     session_data['status'] = 'active'
     session_data['current_question'] = 0
     session_data['user_answers'] = {username: [] for username in session_data['users']}
+    
+    # Save sessions to disk
+    save_sessions()
     
     print(f"✅ Session {session_id} started with {len(session_data['users'])} users")
     
@@ -281,6 +329,9 @@ def api_reset_session():
     for username in session_data['users']:
         session_data['users'][username]['position'] = 0
         session_data['users'][username]['answers'] = []
+    
+    # Save sessions to disk
+    save_sessions()
     
     return jsonify({'success': True})
 
@@ -363,6 +414,9 @@ def api_submit_answer():
         'positions': {username: user_data['position'] 
                      for username, user_data in session_data['users'].items()}
     }, room=f'instructor_{session_id}')
+    
+    # Save sessions to disk
+    save_sessions()
     
     return jsonify({'success': True, 'all_answered': all_answered})
 
