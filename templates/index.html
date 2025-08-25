@@ -125,7 +125,7 @@
                 const data = await response.json();
                 
                 if (data.session_id) {
-                    window.location.href = data.redirect_url;
+                    window.location.href = `/instructor/${data.session_id}`;
                 } else {
                     alert('Error creating session');
                 }
