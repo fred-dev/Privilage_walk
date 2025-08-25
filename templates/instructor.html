@@ -249,10 +249,19 @@
             border-left: 4px solid #ffc107;
         }
         
+        .question-progress-display.all-answered {
+            background: #d4edda;
+            border-left-color: #28a745;
+        }
+        
         .question-progress-display h3 {
             margin: 0 0 0.5rem 0;
             color: #856404;
             font-size: 1rem;
+        }
+        
+        .question-progress-display.all-answered h3 {
+            color: #155724;
         }
         
         .current-question {
@@ -261,9 +270,36 @@
             margin-bottom: 0.5rem;
         }
         
+        .question-progress-display.all-answered .current-question {
+            color: #155724;
+        }
+        
         .answered-status {
             font-size: 0.9rem;
             color: #856404;
+        }
+        
+        .question-progress-display.all-answered .answered-status {
+            color: #155724;
+        }
+        
+        .next-question-btn {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            margin-top: 1rem;
+            width: 100%;
+            transition: all 0.3s ease;
+        }
+        
+        .next-question-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(40, 167, 69, 0.3);
         }
         
         .user-item.answered {
@@ -533,6 +569,9 @@
                 <h3>📝 Question Progress</h3>
                 <div class="current-question" id="currentQuestionDisplay"></div>
                 <div class="answered-status" id="answeredStatusDisplay"></div>
+                <button class="next-question-btn" id="nextQuestionBtn" style="display: none;" onclick="advanceToNextQuestion()">
+                    ➡️ Next Question
+                </button>
             </div>
             <div class="user-list" id="userList">
                 <p style="text-align: center; color: #666;">No students joined yet</p>
@@ -725,6 +764,7 @@
             const questionProgressDisplay = document.getElementById('questionProgressDisplay');
             const currentQuestionDisplay = document.getElementById('currentQuestionDisplay');
             const answeredStatusDisplay = document.getElementById('answeredStatusDisplay');
+            const nextQuestionBtn = document.getElementById('nextQuestionBtn');
             
             if (questionProgressDisplay && currentQuestionDisplay && answeredStatusDisplay) {
                 questionProgressDisplay.style.display = 'block';
@@ -742,6 +782,20 @@
                 
                 // Update user list to reflect current answer status
                 updateUserList();
+
+                // Check if all users have answered the current question
+                if (answeredCount === totalUsers && totalUsers > 0) {
+                    questionProgressDisplay.classList.add('all-answered');
+                    answeredStatusDisplay.innerHTML += `
+                        <div style="margin-top: 0.5rem; font-weight: 600; color: #155724;">
+                            🎉 All users have answered! Ready for next question.
+                        </div>
+                    `;
+                    nextQuestionBtn.style.display = 'block'; // Show next question button
+                } else {
+                    questionProgressDisplay.classList.remove('all-answered');
+                    nextQuestionBtn.style.display = 'none'; // Hide next question button
+                }
             }
         }
 
@@ -1008,6 +1062,64 @@
                 alert('Error starting session');
             }
         });
+
+        // Handle next question button click
+        document.getElementById('nextQuestionBtn').addEventListener('click', async function() {
+            console.log('Next Question Button Clicked!');
+            try {
+                const response = await fetch(`/api/advance_question/${sessionId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ session_id: sessionId })
+                });
+                const data = await response.json();
+                console.log('Advance question response:', data);
+                if (data.success) {
+                    console.log('✅ Question advanced successfully');
+                    // Reload current question and progress
+                    await loadCurrentQuestion();
+                    updateQuestionProgress();
+                    // Re-create user markers to update their positions
+                    createUserMarkers();
+                } else {
+                    alert('Error advancing question: ' + data.error);
+                }
+            } catch (error) {
+                console.error('Error advancing question:', error);
+                alert('Error advancing question');
+            }
+        });
+
+        // Function to advance to next question (called from onclick)
+        async function advanceToNextQuestion() {
+            console.log('Next Question Button Clicked!');
+            try {
+                const response = await fetch(`/api/advance_question/${sessionId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ session_id: sessionId })
+                });
+                const data = await response.json();
+                console.log('Advance question response:', data);
+                if (data.success) {
+                    console.log('✅ Question advanced successfully');
+                    // Reload current question and progress
+                    await loadCurrentQuestion();
+                    updateQuestionProgress();
+                    // Re-create user markers to update their positions
+                    createUserMarkers();
+                } else {
+                    alert('Error advancing question: ' + data.error);
+                }
+            } catch (error) {
+                console.error('Error advancing question:', error);
+                alert('Error advancing question');
+            }
+        }
 
         // Start polling when page loads
         document.addEventListener('DOMContentLoaded', function() {

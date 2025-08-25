@@ -460,6 +460,46 @@ def get_user_answers(session_id):
         'total_questions': len(session_data['questions'])
     })
 
+@app.route('/api/advance_question/<session_id>', methods=['POST'])
+def advance_question(session_id):
+    """Manually advance to the next question (instructor control)"""
+    if session_id not in active_sessions:
+        return jsonify({'error': 'Session not found'}), 404
+    
+    session_data = active_sessions[session_id]
+    
+    if session_data['status'] != 'active':
+        return jsonify({'error': 'Session is not active'}), 400
+    
+    current_q = session_data['current_question']
+    questions = session_data['questions']
+    
+    # Check if we can advance
+    if current_q >= len(questions) - 1:
+        return jsonify({'error': 'Already at the last question'}), 400
+    
+    # Check if all users have answered the current question
+    all_answered = True
+    for username, user_data in session_data['users'].items():
+        if len(user_data.get('answers', [])) <= current_q:
+            all_answered = False
+            break
+    
+    if not all_answered:
+        return jsonify({'error': 'Not all users have answered the current question'}), 400
+    
+    # Advance to next question
+    session_data['current_question'] = current_q + 1
+    session_data['last_activity'] = datetime.now().isoformat()
+    
+    log_session_state(session_id, "QUESTION_ADVANCED", f"Q{current_q + 1} -> Q{current_q + 2}")
+    
+    return jsonify({
+        'success': True,
+        'new_question': current_q + 2,
+        'total_questions': len(questions)
+    })
+
 @app.route('/health')
 def health_check():
     """Health check endpoint for Render"""
