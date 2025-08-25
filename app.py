@@ -37,17 +37,8 @@ def load_questions():
 # Store active sessions in memory (simple)
 active_sessions = {}
 
-# Store SSE clients for each session
-sse_clients = {}
-
 # Load questions
 QUESTIONS = load_questions()
-
-def send_sse_event(event_type, data, session_id):
-    """Send SSE event to all clients in a session"""
-    if session_id in sse_clients:
-        # This will be handled by the SSE stream endpoint
-        pass
 
 @app.route('/')
 def index():
@@ -88,11 +79,9 @@ def create_session():
         'users': {},
         'status': 'waiting',
         'current_question': 0,
-        'created_at': datetime.now()
+        'created_at': datetime.now(),
+        'pending_events': []
     }
-    
-    # Initialize SSE clients list for this session
-    sse_clients[session_id] = []
     
     return jsonify({'session_id': session_id, 'redirect_url': f'/instructor/{session_id}'})
 
@@ -310,8 +299,8 @@ def api_reset_session():
 
 def notify_sse_clients(session_id, event_type, data):
     """Notify all SSE clients in a session about an event"""
-    if session_id in sse_clients:
-        # Mark the session as having pending events
+    if session_id in active_sessions:
+        # Add event to pending events
         if 'pending_events' not in active_sessions[session_id]:
             active_sessions[session_id]['pending_events'] = []
         
@@ -334,7 +323,7 @@ def stream(session_id):
         # Keep track of last event sent
         last_event_index = 0
         
-        # Keep connection alive with periodic heartbeats and check for new events
+        # Keep connection alive and check for new events
         while True:
             try:
                 # Check for new events
@@ -345,9 +334,11 @@ def stream(session_id):
                         yield f"data: {json.dumps(event)}\n\n"
                         last_event_index += 1
                 
-                # Send heartbeat every 30 seconds
-                yield f"data: {json.dumps({'type': 'heartbeat', 'timestamp': datetime.now().isoformat()})}\n\n"
-                time.sleep(30)
+                # Send a simple keepalive without blocking
+                yield f"data: {json.dumps({'type': 'keepalive', 'timestamp': datetime.now().isoformat()})}\n\n"
+                
+                # Use a very short sleep to avoid blocking the worker
+                time.sleep(1)
                 
             except GeneratorExit:
                 break
