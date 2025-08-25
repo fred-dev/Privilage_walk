@@ -62,13 +62,22 @@ def instructor_view(session_id):
     
     log_session_state(session_id, "INSTRUCTOR_VIEW_ACCESSED")
     
-    # Get local IP for testing
+    # Get actual network IP address that other computers can reach
     import socket
     try:
-        hostname = socket.gethostname()
-        local_ip = socket.gethostbyname(hostname)
+        # Create a socket to get the local IP address
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        # Connect to a remote address (doesn't actually send data)
+        s.connect(("8.8.8.8", 80))
+        local_ip = s.getsockname()[0]
+        s.close()
     except:
-        local_ip = "127.0.0.1"
+        # Fallback to hostname method
+        try:
+            hostname = socket.gethostname()
+            local_ip = socket.gethostbyname(hostname)
+        except:
+            local_ip = "127.0.0.1"
     
     return render_template('instructor.html', 
                          session_id=session_id,
@@ -112,9 +121,35 @@ def qr_code(session_id):
     if session_id not in active_sessions:
         return "Session not found", 404
     
-    # Create QR code pointing to the Render domain
+    # Get actual network IP address for local development
+    import socket
+    try:
+        # Create a socket to get the local IP address
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        # Connect to a remote address (doesn't actually send data)
+        s.connect(("8.8.8.8", 80))
+        local_ip = s.getsockname()[0]
+        s.close()
+    except:
+        # Fallback to hostname method
+        try:
+            hostname = socket.gethostname()
+            local_ip = socket.gethostbyname(hostname)
+        except:
+            local_ip = "127.0.0.1"
+    
+    # Use local network IP for development, Render domain for production
+    port = int(os.environ.get('PORT', 5001))
+    if os.environ.get('RENDER', False):
+        # Production on Render
+        join_url = f'https://privilage-walk.onrender.com/join/{session_id}'
+    else:
+        # Local development
+        join_url = f'http://{local_ip}:{port}/join/{session_id}'
+    
+    # Create QR code pointing to the correct URL
     qr = qrcode.QRCode(version=1, box_size=10, border=5)
-    qr.add_data(f'https://privilage-walk.onrender.com/join/{session_id}')
+    qr.add_data(join_url)
     qr.make(fit=True)
     
     img = qr.make_image(fill_color="black", back_color="white")

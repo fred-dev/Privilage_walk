@@ -190,7 +190,7 @@
                 
                 if (data.success) {
                     // Redirect to student view
-                    window.location.href = data.redirect_url;
+                    window.location.href = `/student/${sessionId}?username=${encodeURIComponent(username)}`;
                 } else {
                     showError(data.error || 'Failed to join session');
                     // Reset form

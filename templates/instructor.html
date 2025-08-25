@@ -391,6 +391,16 @@
                 <p><strong>Your computer's IP address:</strong></p>
                 <div class="ip-address">{{ network_ip }}</div>
                 <p class="ip-note">Students must be on the same network to connect</p>
+                
+                <div style="margin-top: 1rem; padding: 1rem; background: #e7f3ff; border-radius: 8px; border-left: 4px solid #007bff;">
+                    <h4 style="margin: 0 0 0.5rem 0; color: #0056b3;">🔧 Troubleshooting Tips</h4>
+                    <ul style="margin: 0; padding-left: 1.2rem; font-size: 0.9rem; color: #0056b3;">
+                        <li>Make sure students are connected to the same WiFi network</li>
+                        <li>If students can't connect, try refreshing the IP address</li>
+                        <li>Some corporate networks may block local connections</li>
+                        <li>Test the QR code with your own phone first</li>
+                    </ul>
+                </div>
             </div>
             {% endif %}
             
@@ -410,10 +420,18 @@
                         <button onclick="refreshQRCode()" class="refresh-btn">🔄 Refresh QR Code</button>
                     </div>
                 </div>
-                <div class="join-url">http://127.0.0.1:5001/join/{{ session_id }}</div>
+                <div class="join-url">http://{{ network_ip }}:5001/join/{{ session_id }}</div>
                 <div class="debug-info">
-                    <small>Debug: QR code points to: <code>http://127.0.0.1:5001/join/{{ session_id }}</code></small>
+                    <small>Debug: QR code points to: <code>http://{{ network_ip }}:5001/join/{{ session_id }}</code></small>
                     <br><small>💡 The QR code automatically uses your network IP address so students can connect!</small>
+                    <div style="margin-top: 0.5rem;">
+                        <button onclick="refreshIPAddress()" style="margin-right: 0.5rem; padding: 0.25rem 0.5rem; background: #007bff; color: white; border: none; border-radius: 4px; font-size: 0.8rem;">
+                            🔄 Refresh IP
+                        </button>
+                        <button onclick="copyJoinURL()" style="padding: 0.25rem 0.5rem; background: #28a745; color: white; border: none; border-radius: 4px; font-size: 0.8rem;">
+                            📋 Copy URL
+                        </button>
+                    </div>
                 </div>
             </div>
             
@@ -494,6 +512,7 @@
 
     <script>
         const sessionId = '{{ session_id }}';
+        const networkIp = '{{ network_ip }}';
         
         let users = {};
         let sessionStatus = 'waiting';
@@ -739,6 +758,22 @@
             const qrImage = document.getElementById('qrCodeImage');
             const timestamp = new Date().getTime();
             qrImage.src = `/qr/{{ session_id }}?t=${timestamp}`;
+        }
+
+        // Function to refresh IP address display
+        function refreshIPAddress() {
+            // Reload the page to get updated IP address
+            window.location.reload();
+        }
+
+        // Function to copy join URL to clipboard
+        function copyJoinURL() {
+            const joinURL = `http://${networkIp}:5001/join/${sessionId}`;
+            navigator.clipboard.writeText(joinURL).then(function() {
+                alert('Join URL copied to clipboard!');
+            }, function(err) {
+                console.error('Could not copy text: ', err);
+            });
         }
 
         // Handle go button click
