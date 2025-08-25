@@ -611,7 +611,7 @@
                 
                 <div class="join-url">
                     <p><strong>Join URL:</strong></p>
-                    <div class="url-display" id="joinUrl">http://{{ network_ip }}:5001/join/{{ session_id }}</div>
+                    <div class="url-display" id="joinUrl">https://privilage-walk.onrender.com/join/{{ session_id }}</div>
                     <button class="copy-btn" onclick="copyJoinURL()">📋 Copy URL</button>
                 </div>
             </div>
@@ -1126,11 +1126,18 @@
 
         // Function to copy join URL to clipboard
         function copyJoinURL() {
-            const joinURL = `http://${networkIp}:5001/join/${sessionId}`;
-            navigator.clipboard.writeText(joinURL).then(function() {
+            const joinURL = `https://privilage-walk.onrender.com/join/${sessionId}`;
+            navigator.clipboard.writeText(joinURL).then(() => {
                 alert('Join URL copied to clipboard!');
-            }, function(err) {
-                console.error('Could not copy text: ', err);
+            }).catch(() => {
+                // Fallback for older browsers
+                const textArea = document.createElement('textarea');
+                textArea.value = joinURL;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                alert('Join URL copied to clipboard!');
             });
         }
 
@@ -1235,7 +1242,7 @@
         }
         
         function copyJoinURL() {
-            const joinURL = `http://${networkIp}:5001/join/${sessionId}`;
+            const joinURL = `https://privilage-walk.onrender.com/join/${sessionId}`;
             navigator.clipboard.writeText(joinURL).then(() => {
                 alert('Join URL copied to clipboard!');
             }).catch(() => {

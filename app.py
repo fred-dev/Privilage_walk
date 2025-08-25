@@ -216,31 +216,8 @@ def qr_code(session_id):
     if session_id not in active_sessions:
         return "Session not found", 404
     
-    # Get actual network IP address for local development
-    import socket
-    try:
-        # Create a socket to get the local IP address
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        # Connect to a remote address (doesn't actually send data)
-        s.connect(("8.8.8.8", 80))
-        local_ip = s.getsockname()[0]
-        s.close()
-    except:
-        # Fallback to hostname method
-        try:
-            hostname = socket.gethostname()
-            local_ip = socket.gethostbyname(hostname)
-        except:
-            local_ip = "127.0.0.1"
-    
-    # Use local network IP for development, Render domain for production
-    port = int(os.environ.get('PORT', 5001))
-    if os.environ.get('RENDER', False):
-        # Production on Render
-        join_url = f'https://privilage-walk.onrender.com/join/{session_id}'
-    else:
-        # Local development
-        join_url = f'http://{local_ip}:{port}/join/{session_id}'
+    # Always use Render domain for production
+    join_url = f'https://privilage-walk.onrender.com/join/{session_id}'
     
     # Create QR code pointing to the correct URL
     qr = qrcode.QRCode(version=1, box_size=10, border=5)
