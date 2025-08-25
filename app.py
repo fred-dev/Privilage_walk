@@ -68,6 +68,11 @@ def get_network_ip():
 # Load questions
 QUESTIONS = load_questions()
 
+@app.route('/health')
+def health_check():
+    """Health check endpoint for Render"""
+    return jsonify({'status': 'healthy', 'sessions': len(active_sessions)})
+
 @app.route('/')
 def index():
     """Main page to create a new session"""
@@ -385,7 +390,9 @@ def on_session_reset(data):
         socketio.emit('session_reset', room=f'session_{session_id}')
 
 if __name__ == '__main__':
+    # Use PORT environment variable for Render, fallback to config
+    port = int(os.environ.get('PORT', config['server']['port']))
     socketio.run(app, 
                 debug=config['server']['debug'], 
                 host=config['server']['host'], 
-                port=config['server']['port']) 
+                port=port) 
