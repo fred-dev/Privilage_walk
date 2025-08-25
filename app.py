@@ -109,12 +109,30 @@ QUESTIONS = load_questions()
 
 @app.route('/health')
 def health_check():
-    """Health check endpoint for Render"""
-    return jsonify({'status': 'healthy', 'sessions': len(active_sessions)})
+    """Health check endpoint for Render - optimized for speed"""
+    try:
+        # Super fast response - no database queries or heavy operations
+        return jsonify({
+            'status': 'healthy',
+            'timestamp': datetime.now().isoformat(),
+            'sessions_count': len(active_sessions),
+            'uptime': 'running'
+        })
+    except Exception as e:
+        # Even if there's an error, return quickly
+        return jsonify({
+            'status': 'error',
+            'error': str(e),
+            'timestamp': datetime.now().isoformat()
+        }), 500
 
 @app.route('/')
 def index():
     """Main page to create a new session"""
+    # Add a simple health check response for Render
+    user_agent = request.headers.get('User-Agent', '')
+    if 'Render' in user_agent:
+        return jsonify({'status': 'healthy', 'message': 'Privilege Walk app is running'})
     return render_template('index.html')
 
 @app.route('/create_session', methods=['POST'])
