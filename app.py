@@ -317,11 +317,12 @@ def stream(session_id):
                             last_event_index += 1
                             logger.debug(f"SSE event sent: {session_id} | {event['type']}")
 
-                    # Send a simple keepalive without blocking
+                    # Send keepalive every 15 seconds (non-blocking with gevent)
                     yield f"data: {json.dumps({'type': 'keepalive', 'timestamp': datetime.now().isoformat()})}\n\n"
-
-                    # Use a very short sleep to avoid blocking the worker
-                    time.sleep(1)
+                    
+                    # Use gevent.sleep instead of time.sleep for non-blocking behavior
+                    import gevent
+                    gevent.sleep(15)
 
                 except GeneratorExit:
                     logger.info(f"SSE stream closed by client for session: {session_id}")

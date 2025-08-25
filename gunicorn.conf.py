@@ -1,27 +1,23 @@
-# Gunicorn configuration file for Render deployment
-# This prevents worker timeouts and improves stability
+# Gunicorn configuration for Render deployment
+# Using non-blocking workers to handle SSE streams properly
 
 # Server socket
 bind = "0.0.0.0:10000"
 backlog = 2048
 
-# Worker processes
-workers = 1  # Single worker for free tier to avoid session conflicts
-worker_class = "sync"
+# Worker processes - CRITICAL: Use non-blocking workers for SSE
+workers = 1  # Single worker for free tier
+worker_class = "gevent"  # Non-blocking worker that can handle multiple connections
 worker_connections = 1000
-max_requests = 1000
-max_requests_jitter = 50
 
-# Timeout settings - critical for SSE streams
-timeout = 120  # Increase from default 30s
-keepalive = 2
+# Timeout settings - keep default 30s since we're using non-blocking workers
+timeout = 30
 graceful_timeout = 30
 
 # Logging
 accesslog = "-"
 errorlog = "-"
 loglevel = "info"
-access_log_format = '%(h)s %(l)s %(u)s %(t)s "%(r)s" %(s)s %(b)s "%(f)s" "%(a)s" %(D)s'
 
 # Process naming
 proc_name = "privilege-walk"
@@ -30,7 +26,8 @@ proc_name = "privilege-walk"
 preload_app = True
 
 # Worker lifecycle
-worker_tmp_dir = "/dev/shm"  # Use RAM for temp files
+max_requests = 1000
+max_requests_jitter = 50
 worker_exit_on_app_exit = False
 
 # Security
