@@ -1,0 +1,800 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Privilege Walk - Instructor View</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f5f5f5;
+            min-height: 100vh;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+        
+        .session-name {
+            font-size: 2rem;
+            color: #333;
+            margin-bottom: 0.5rem;
+        }
+        
+        .session-id {
+            color: #666;
+            font-size: 1.1rem;
+        }
+        
+        .main-content {
+            display: flex;
+            gap: 3rem;
+            max-width: 1200px;
+            margin: 0 auto;
+            align-items: flex-start;
+        }
+        
+        .left-panel {
+            flex: 1;
+            background: white;
+            padding: 2rem;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        
+        .right-panel {
+            flex: 1;
+            background: white;
+            padding: 2rem;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        
+        .network-info {
+            background: #f8f9fa;
+            padding: 1.5rem;
+            border-radius: 10px;
+            margin-bottom: 2rem;
+            border-left: 4px solid #667eea;
+        }
+        
+        .network-info h3 {
+            margin: 0 0 1rem 0;
+            color: #333;
+            font-size: 1.2rem;
+        }
+        
+        .ip-address {
+            background: #667eea;
+            color: white;
+            padding: 0.75rem;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 1.2rem;
+            font-weight: 600;
+            text-align: center;
+            margin: 0.5rem 0;
+        }
+        
+        .ip-note {
+            color: #666;
+            font-size: 0.9rem;
+            margin: 0.5rem 0 0 0;
+            text-align: center;
+        }
+        
+        .qr-container {
+            margin: 2rem 0;
+            padding: 2rem;
+            border: 2px dashed #ddd;
+            border-radius: 10px;
+        }
+        
+        .qr-instructions {
+            margin-bottom: 2rem;
+            text-align: left;
+        }
+        
+        .qr-instructions h3 {
+            margin: 0 0 1rem 0;
+            color: #333;
+            font-size: 1.2rem;
+            text-align: center;
+        }
+        
+        .qr-instructions ol {
+            margin: 0;
+            padding-left: 1.5rem;
+            color: #555;
+            line-height: 1.6;
+        }
+        
+        .qr-instructions li {
+            margin-bottom: 0.5rem;
+        }
+        
+        .qr-code {
+            margin: 0 auto;
+            text-align: center;
+        }
+        
+        .qr-controls {
+            margin-top: 1rem;
+        }
+        
+        .refresh-btn {
+            background: #6c757d;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 5px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+        }
+        
+        .refresh-btn:hover {
+            background: #5a6268;
+        }
+        
+        .join-url {
+            margin-top: 1rem;
+            padding: 0.5rem;
+            background: #f8f9fa;
+            border-radius: 5px;
+            font-family: monospace;
+            word-break: break-all;
+        }
+        
+        .debug-info {
+            margin-top: 0.5rem;
+            text-align: center;
+            color: #666;
+            font-size: 0.8rem;
+        }
+        
+        .debug-info code {
+            background: #e9ecef;
+            padding: 0.2rem 0.4rem;
+            border-radius: 3px;
+            font-family: monospace;
+        }
+        
+        .user-count {
+            font-size: 3rem;
+            font-weight: bold;
+            color: #667eea;
+            margin: 1rem 0;
+        }
+        
+        .user-list {
+            text-align: left;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .user-item {
+            padding: 0.5rem;
+            margin: 0.25rem 0;
+            background: #f8f9fa;
+            border-radius: 5px;
+            border-left: 4px solid #667eea;
+        }
+        
+        .go-button {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            color: white;
+            border: none;
+            padding: 1rem 3rem;
+            border-radius: 10px;
+            font-size: 1.5rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+            margin: 1rem 0;
+            width: 100%;
+        }
+        
+        .go-button:hover:not(:disabled) {
+            transform: translateY(-2px);
+        }
+        
+        .go-button:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+        }
+        
+        .status {
+            padding: 1rem;
+            border-radius: 10px;
+            margin: 1rem 0;
+            text-align: center;
+            font-weight: 600;
+        }
+        
+        .status.waiting {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        
+        .status.active {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        
+        .status.finished {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .testing-note {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 8px;
+            padding: 1rem;
+            margin: 1rem 0;
+            text-align: center;
+        }
+        
+        .testing-note p {
+            margin: 0;
+            color: #856404;
+            font-size: 0.9rem;
+        }
+        
+        .privilege-walk-view {
+            display: none;
+            background: white;
+            padding: 2rem;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            margin-top: 2rem;
+        }
+        
+        .walk-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+        }
+        
+        .back-btn {
+            background: #6c757d;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 5px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+        }
+        
+        .back-btn:hover {
+            background: #5a6268;
+        }
+        
+        .walk-container {
+            position: relative;
+            height: 600px;
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            background: linear-gradient(to bottom, #e8f5e8 0%, #f0f0f0 50%, #ffe8e8 100%);
+            overflow: hidden;
+        }
+        
+        .user-marker {
+            position: absolute;
+            width: 120px;
+            height: 60px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 10px;
+            font-weight: 600;
+            text-align: center;
+            transition: top 0.5s ease;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+        
+        .question-display {
+            text-align: center;
+            margin: 1rem 0;
+            padding: 1rem;
+            background: #f8f9fa;
+            border-radius: 10px;
+            border-left: 4px solid #667eea;
+        }
+        
+        .question-text {
+            font-size: 1.2rem;
+            color: #333;
+            margin-bottom: 0.5rem;
+        }
+        
+        .question-progress {
+            color: #666;
+            font-size: 0.9rem;
+        }
+        
+        .final-results {
+            display: none;
+            text-align: center;
+            margin-top: 2rem;
+        }
+        
+        .final-positions {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+        
+        .position-card {
+            background: #f8f9fa;
+            padding: 1rem;
+            border-radius: 10px;
+            border-left: 4px solid #667eea;
+        }
+        
+        .position-rank {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #667eea;
+        }
+        
+        .position-name {
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .position-value {
+            color: #666;
+            font-size: 0.9rem;
+        }
+        
+        .session-actions {
+            margin-top: 3rem;
+            text-align: center;
+        }
+        
+        .session-actions h3 {
+            margin-bottom: 2rem;
+            color: #333;
+        }
+        
+        .action-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            max-width: 400px;
+            margin: 0 auto;
+        }
+        
+        .action-btn {
+            padding: 1rem 1.5rem;
+            border: none;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+        }
+        
+        .action-btn:hover {
+            transform: translateY(-2px);
+        }
+        
+        .reset-btn {
+            background: linear-gradient(135deg, #ffc107 0%, #ff9800 100%);
+            color: white;
+        }
+        
+        .new-btn {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1 class="session-name">{{ session_name }}</h1>
+        <p class="session-id">Session ID: {{ session_id }}</p>
+    </div>
+    
+    <div class="main-content">
+        <div class="left-panel">
+            <h2>📱 Student Join</h2>
+            
+            {% if network_ip %}
+            <div class="network-info">
+                <h3>🌐 Network Information</h3>
+                <p><strong>Your computer's IP address:</strong></p>
+                <div class="ip-address">{{ network_ip }}</div>
+                <p class="ip-note">Students must be on the same network to connect</p>
+            </div>
+            {% endif %}
+            
+            <div class="qr-container">
+                <div class="qr-instructions">
+                    <h3>📱 How Students Join</h3>
+                    <ol>
+                        <li>Students scan this QR code with their phone camera</li>
+                        <li>They'll be taken to a join page</li>
+                        <li>They enter a nickname (can be fake)</li>
+                        <li>They'll see "Please wait" until you start</li>
+                    </ol>
+                </div>
+                <div class="qr-code">
+                    <img id="qrCodeImage" src="/qr/{{ session_id }}" alt="QR Code for joining session" style="max-width: 300px; height: auto;">
+                    <div class="qr-controls">
+                        <button onclick="refreshQRCode()" class="refresh-btn">🔄 Refresh QR Code</button>
+                    </div>
+                </div>
+                <div class="join-url">{{ qr_url }}</div>
+                <div class="debug-info">
+                    <small>Debug: QR code points to: <code>{{ qr_url }}</code></small>
+                    <br><small>💡 The QR code automatically uses your network IP address so students can connect!</small>
+                </div>
+            </div>
+            
+            <div class="status waiting" id="status">
+                Waiting for students to join...
+            </div>
+            
+            <div class="testing-note">
+                <p><strong>💡 Testing Tip:</strong> Test the QR code with your own phone first to make sure it works!</p>
+            </div>
+            
+            <div class="user-count" id="userCount">0</div>
+            <p>Students joined</p>
+            
+            <button class="go-button" id="goButton" disabled>
+                🚀 Start Privilege Walk
+            </button>
+            
+            <div class="debug-controls" style="margin-top: 1rem; padding: 1rem; background: #f8f9fa; border-radius: 8px;">
+                <p><strong>🐛 Debug Controls:</strong></p>
+                <button onclick="testViewTransition()" style="margin: 0.5rem; padding: 0.5rem; background: #007bff; color: white; border: none; border-radius: 4px;">
+                    Test View Transition
+                </button>
+                <button onclick="showPrivilegeWalkView()" style="margin: 0.5rem; padding: 0.5rem; background: #28a745; color: white; border: none; border-radius: 4px;">
+                    Force Show Walk View
+                </button>
+                <button onclick="showMainView()" style="margin: 0.5rem; padding: 0.5rem; background: #6c757d; color: white; border: none; border-radius: 4px;">
+                    Force Show Main View
+                </button>
+            </div>
+        </div>
+        
+        <div class="right-panel">
+            <h2>👥 Connected Students</h2>
+            <div class="user-list" id="userList">
+                <p style="text-align: center; color: #666;">No students joined yet</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="privilege-walk-view" id="privilegeWalkView">
+        <div class="walk-header">
+            <h2>🚶‍♂️ Privilege Walk in Progress</h2>
+            <button onclick="showMainView()" class="back-btn">← Back to Setup</button>
+        </div>
+        
+        <div class="question-display" id="questionDisplay">
+            <div class="question-text" id="questionText"></div>
+            <div class="question-progress" id="questionProgress"></div>
+        </div>
+        
+        <div class="walk-container" id="walkContainer">
+            <!-- User markers will be dynamically added here -->
+        </div>
+    </div>
+    
+    <div class="final-results" id="finalResults">
+        <h2>🏁 Final Results</h2>
+        <div class="final-positions" id="finalPositions">
+            <!-- Final positions will be displayed here -->
+        </div>
+        
+        <div class="session-actions">
+            <h3>🔄 What would you like to do next?</h3>
+            <div class="action-buttons">
+                <button onclick="resetSession()" class="action-btn reset-btn">
+                    🔄 Reset Session (Same Students, New Questions)
+                </button>
+                <button onclick="createNewSession()" class="action-btn new-btn">
+                    🆕 Create New Session (Fresh Start)
+                </button>
+                <button onclick="showMainView()" class="action-btn back-btn">
+                    ← Back to Setup
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const sessionId = '{{ session_id }}';
+        const socket = io();
+        
+        let users = {};
+        let sessionStatus = 'waiting';
+        
+        // Join instructor room
+        socket.emit('join_instructor', { session_id: sessionId });
+        
+        // Listen for user joins
+        socket.on('user_joined', function(data) {
+            users[data.username] = { joined_at: new Date() };
+            updateUserCount();
+            updateUserList();
+            updateGoButton();
+        });
+        
+        // Listen for session start
+        socket.on('session_started', function(data) {
+            console.log('🎯 SESSION STARTED EVENT RECEIVED!', data);
+            sessionStatus = 'active';
+            updateStatus();
+            console.log('About to call showPrivilegeWalkView()...');
+            showPrivilegeWalkView();
+            updateQuestionDisplay(data.question, data.question_number, data.total_questions);
+            createUserMarkers();
+        });
+        
+        // Listen for next question
+        socket.on('next_question', function(data) {
+            updateQuestionDisplay(data.question, data.question_number, data.total_questions);
+        });
+        
+        // Listen for position updates
+        socket.on('position_update', function(data) {
+            updateUserPositions(data.positions);
+        });
+        
+        // Listen for session finished
+        socket.on('session_finished', function(data) {
+            sessionStatus = 'finished';
+            updateStatus();
+            showFinalResults(data.final_positions);
+        });
+        
+        function updateUserCount() {
+            document.getElementById('userCount').textContent = Object.keys(users).length;
+        }
+        
+        function updateUserList() {
+            const userList = document.getElementById('userList');
+            if (Object.keys(users).length === 0) {
+                userList.innerHTML = '<p style="text-align: center; color: #666;">No students joined yet</p>';
+                return;
+            }
+            
+            userList.innerHTML = Object.keys(users).map(username => 
+                `<div class="user-item">👤 ${username}</div>`
+            ).join('');
+        }
+        
+        function updateGoButton() {
+            const goButton = document.getElementById('goButton');
+            goButton.disabled = Object.keys(users).length === 0;
+        }
+        
+        function updateStatus() {
+            const status = document.getElementById('status');
+            status.className = `status ${sessionStatus}`;
+            
+            switch(sessionStatus) {
+                case 'waiting':
+                    status.textContent = 'Waiting for students to join...';
+                    break;
+                case 'active':
+                    status.textContent = 'Privilege walk in progress...';
+                    break;
+                case 'finished':
+                    status.textContent = 'Session completed!';
+                    break;
+            }
+        }
+        
+        function showPrivilegeWalkView() {
+            console.log('=== SHOWING PRIVILEGE WALK VIEW ===');
+            
+            // Hide the main content (student join area)
+            const mainContent = document.querySelector('.main-content');
+            console.log('Main content element:', mainContent);
+            if (mainContent) {
+                mainContent.style.display = 'none';
+                console.log('✅ Main content hidden');
+            } else {
+                console.log('❌ Main content not found!');
+            }
+            
+            // Show the privilege walk view
+            const walkView = document.getElementById('privilegeWalkView');
+            console.log('Privilege walk view element:', walkView);
+            if (walkView) {
+                walkView.style.display = 'block';
+                console.log('✅ Privilege walk view shown');
+                
+                // Force a repaint
+                walkView.offsetHeight;
+                
+                // Add a visible indicator
+                walkView.style.border = '3px solid red';
+                console.log('Added red border to make it visible');
+            } else {
+                console.log('❌ Privilege walk view not found!');
+            }
+            
+            // Debug: check all elements
+            console.log('All elements found:');
+            console.log('- .main-content:', document.querySelector('.main-content'));
+            console.log('- #privilegeWalkView:', document.getElementById('privilegeWalkView'));
+            console.log('- #finalResults:', document.getElementById('finalResults'));
+        }
+        
+        function showMainView() {
+            // Show the main content (student join area)
+            document.querySelector('.main-content').style.display = 'flex';
+            // Hide the privilege walk view and final results
+            document.getElementById('privilegeWalkView').style.display = 'none';
+            document.getElementById('finalResults').style.display = 'none';
+        }
+        
+        async function resetSession() {
+            // Reset the current session for new questions
+            if (confirm('Reset this session? Students will keep their usernames but start fresh questions.')) {
+                try {
+                    const response = await fetch('/api/reset_session', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ session_id: sessionId })
+                    });
+                    
+                    const data = await response.json();
+                    if (data.success) {
+                        // Hide final results
+                        document.getElementById('finalResults').style.display = 'none';
+                        // Show privilege walk view again
+                        showPrivilegeWalkView();
+                        // Reset session state
+                        sessionStatus = 'waiting';
+                        updateStatus();
+                        // Clear previous results
+                        document.getElementById('walkContainer').innerHTML = '';
+                        // Re-enable go button
+                        document.getElementById('goButton').disabled = false;
+                        // Notify students that session is reset
+                        socket.emit('session_reset');
+                    }
+                } catch (error) {
+                    console.error('Error resetting session:', error);
+                    alert('Error resetting session');
+                }
+            }
+        }
+        
+        function createNewSession() {
+            // Create a completely new session
+            if (confirm('Create a new session? This will generate a new QR code and session ID.')) {
+                window.location.href = '/';
+            }
+        }
+        
+        function testViewTransition() {
+            console.log('=== TESTING VIEW TRANSITION ===');
+            console.log('Current session status:', sessionStatus);
+            console.log('Current users:', users);
+            
+            // Test the transition manually
+            showPrivilegeWalkView();
+            
+            // After 3 seconds, go back
+            setTimeout(() => {
+                console.log('Going back to main view...');
+                showMainView();
+            }, 3000);
+        }
+        
+        function updateQuestionDisplay(question, questionNumber, totalQuestions) {
+            document.getElementById('questionText').textContent = question;
+            document.getElementById('questionProgress').textContent = 
+                `Question ${questionNumber} of ${totalQuestions}`;
+        }
+        
+        function createUserMarkers() {
+            const container = document.getElementById('walkContainer');
+            const userCount = Object.keys(users).length;
+            const sectionWidth = 100 / userCount;
+            
+            container.innerHTML = '';
+            
+            Object.keys(users).forEach((username, index) => {
+                const marker = document.createElement('div');
+                marker.className = 'user-marker';
+                marker.id = `marker-${username}`;
+                marker.textContent = username;
+                marker.style.left = `${(index * sectionWidth) + (sectionWidth / 2) - 60}px`;
+                marker.style.top = '270px'; // Center vertically
+                container.appendChild(marker);
+            });
+        }
+        
+        function updateUserPositions(positions) {
+            Object.keys(positions).forEach(username => {
+                const marker = document.getElementById(`marker-${username}`);
+                if (marker) {
+                    // Convert position to screen coordinates
+                    // Position ranges from -100 to +100, convert to 0-600px
+                    const screenY = 300 - (positions[username] * 3); // 300 is center, 3 is scale factor
+                    marker.style.top = `${Math.max(0, Math.min(540, screenY))}px`;
+                }
+            });
+        }
+        
+        function showFinalResults(finalPositions) {
+            const finalResults = document.getElementById('finalResults');
+            const finalPositionsDiv = document.getElementById('finalPositions');
+            
+            // Sort by position (highest first)
+            const sortedPositions = Object.entries(finalPositions)
+                .sort(([,a], [,b]) => b - a);
+            
+            finalPositionsDiv.innerHTML = sortedPositions.map(([username, position], index) => `
+                <div class="position-card">
+                    <div class="position-rank">#${index + 1}</div>
+                    <div class="position-name">${username}</div>
+                    <div class="position-value">Position: ${position.toFixed(1)}</div>
+                </div>
+            `).join('');
+            
+            finalResults.style.display = 'block';
+        }
+        
+        // Function to refresh QR code
+        function refreshQRCode() {
+            const qrImage = document.getElementById('qrCodeImage');
+            const timestamp = new Date().getTime();
+            qrImage.src = `/qr/{{ session_id }}?t=${timestamp}`;
+        }
+        
+        // Handle go button click
+        document.getElementById('goButton').addEventListener('click', async function() {
+            console.log('🚀 GO BUTTON CLICKED!');
+            try {
+                console.log('Sending start session request...');
+                const response = await fetch('/api/start_session', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ session_id: sessionId })
+                });
+                
+                const data = await response.json();
+                console.log('Start session response:', data);
+                if (!data.success) {
+                    alert('Error starting session: ' + data.error);
+                } else {
+                    console.log('✅ Session start request successful');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Error starting session');
+            }
+        });
+    </script>
+</body>
+</html> 

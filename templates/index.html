@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Privilege Walk - Create Session</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .container {
+            background: white;
+            padding: 3rem;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            text-align: center;
+            max-width: 500px;
+            width: 90%;
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 2rem;
+            font-size: 2.5rem;
+        }
+        
+        .form-group {
+            margin-bottom: 2rem;
+            text-align: left;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: #555;
+            font-weight: 600;
+        }
+        
+        input[type="text"] {
+            width: 100%;
+            padding: 1rem;
+            border: 2px solid #e1e5e9;
+            border-radius: 10px;
+            font-size: 1rem;
+            transition: border-color 0.3s ease;
+            box-sizing: border-box;
+        }
+        
+        input[type="text"]:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 1rem 2rem;
+            border-radius: 10px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+            width: 100%;
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+        }
+        
+        .description {
+            color: #666;
+            margin-bottom: 2rem;
+            line-height: 1.6;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚶‍♂️ Privilege Walk</h1>
+        <p class="description">
+            Create a new session for your students to participate in the privilege walk activity. 
+            Each session will have a unique QR code that students can scan to join.
+        </p>
+        
+        <form id="createSessionForm">
+            <div class="form-group">
+                <label for="sessionName">Session Name:</label>
+                <input type="text" id="sessionName" name="sessionName" 
+                       placeholder="e.g., Sociology 101 - Section A" required>
+            </div>
+            
+            <button type="submit">Create New Session</button>
+        </form>
+    </div>
+
+    <script>
+        document.getElementById('createSessionForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const sessionName = document.getElementById('sessionName').value;
+            const button = document.querySelector('button');
+            const originalText = button.textContent;
+            
+            button.textContent = 'Creating...';
+            button.disabled = true;
+            
+            try {
+                const response = await fetch('/create_session', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: `session_name=${encodeURIComponent(sessionName)}`
+                });
+                
+                const data = await response.json();
+                
+                if (data.session_id) {
+                    window.location.href = data.redirect_url;
+                } else {
+                    alert('Error creating session');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Error creating session');
+            } finally {
+                button.textContent = originalText;
+                button.disabled = false;
+            }
+        });
+    </script>
+</body>
+</html> 

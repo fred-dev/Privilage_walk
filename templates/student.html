@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Privilege Walk - Student View</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+        
+        .username {
+            font-size: 1.5rem;
+            color: white;
+            margin-bottom: 0.5rem;
+        }
+        
+        .session-info {
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 1rem;
+        }
+        
+        .waiting-screen {
+            background: white;
+            padding: 3rem 2rem;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+        
+        .waiting-icon {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+        }
+        
+        .waiting-text {
+            font-size: 1.5rem;
+            color: #333;
+            margin-bottom: 1rem;
+        }
+        
+        .waiting-subtext {
+            color: #666;
+            line-height: 1.6;
+        }
+        
+        .question-screen {
+            display: none;
+            background: white;
+            padding: 2rem;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            margin-bottom: 2rem;
+        }
+        
+        .question-header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+        
+        .question-number {
+            color: #667eea;
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+        
+        .question-text {
+            font-size: 1.3rem;
+            color: #333;
+            line-height: 1.6;
+            margin-bottom: 2rem;
+        }
+        
+        .answer-buttons {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+        }
+        
+        .answer-button {
+            flex: 1;
+            padding: 1.5rem 1rem;
+            border: none;
+            border-radius: 15px;
+            font-size: 1.2rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            max-width: 200px;
+        }
+        
+        .answer-button:hover:not(:disabled) {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+        }
+        
+        .answer-button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        
+        .agree-button {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            color: white;
+        }
+        
+        .disagree-button {
+            background: linear-gradient(135deg, #dc3545 0%, #fd7e14 100%);
+            color: white;
+        }
+        
+        .progress-bar {
+            background: #f8f9fa;
+            border-radius: 10px;
+            height: 8px;
+            margin: 2rem 0;
+            overflow: hidden;
+        }
+        
+        .progress-fill {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            height: 100%;
+            transition: width 0.5s ease;
+            width: 0%;
+        }
+        
+        .progress-text {
+            text-align: center;
+            color: #666;
+            font-size: 0.9rem;
+            margin-bottom: 1rem;
+        }
+        
+        .thank-you-screen {
+            display: none;
+            background: white;
+            padding: 3rem 2rem;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        
+        .thank-you-icon {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+        }
+        
+        .thank-you-text {
+            font-size: 1.5rem;
+            color: #333;
+            margin-bottom: 1rem;
+        }
+        
+        .thank-you-subtext {
+            color: #666;
+            line-height: 1.6;
+        }
+        
+        .loading {
+            text-align: center;
+            margin: 2rem 0;
+        }
+        
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .position-indicator {
+            background: #f8f9fa;
+            padding: 1rem;
+            border-radius: 10px;
+            margin: 1rem 0;
+            text-align: center;
+            border-left: 4px solid #667eea;
+        }
+        
+        .position-value {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: #667eea;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1 class="username">👤 {{ username }}</h1>
+            <p class="session-info">Session: {{ session_id }}</p>
+        </div>
+        
+        <!-- Waiting Screen -->
+        <div class="waiting-screen" id="waitingScreen">
+            <div class="waiting-icon">⏳</div>
+            <div class="waiting-text">Please wait...</div>
+            <div class="waiting-subtext">
+                The instructor will start the privilege walk activity soon. 
+                You'll see questions appear here when it begins.
+            </div>
+        </div>
+        
+        <!-- Question Screen -->
+        <div class="question-screen" id="questionScreen">
+            <div class="question-header">
+                <div class="question-number" id="questionNumber">Question 1 of 12</div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+                <div class="progress-text" id="progressText">0% Complete</div>
+            </div>
+            
+            <div class="question-text" id="questionText">
+                <!-- Question text will be inserted here -->
+            </div>
+            
+            <div class="answer-buttons">
+                <button class="answer-button agree-button" id="agreeButton" onclick="submitAnswer(true)">
+                    👍 Agree
+                </button>
+                <button class="answer-button disagree-button" id="disagreeButton" onclick="submitAnswer(false)">
+                    👎 Disagree
+                </button>
+            </div>
+            
+            <div class="position-indicator">
+                <div>Your current position:</div>
+                <div class="position-value" id="positionValue">0</div>
+            </div>
+        </div>
+        
+        <!-- Thank You Screen -->
+        <div class="thank-you-screen" id="thankYouScreen">
+            <div class="thank-you-icon">🎉</div>
+            <div class="thank-you-text">Thank you for participating!</div>
+            <div class="thank-you-subtext">
+                The privilege walk activity has been completed. 
+                Check the main screen to see the final results.
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const sessionId = '{{ session_id }}';
+        const username = '{{ username }}';
+        const socket = io();
+        
+        let currentQuestion = 0;
+        let totalQuestions = 12; // Total number of privilege walk questions
+        let userPosition = 0;
+        let hasAnswered = false;
+        
+        // Join student room
+        socket.emit('join_student', { session_id: sessionId });
+        
+        // Listen for session start
+        socket.on('session_started', function(data) {
+            currentQuestion = 0;
+            showQuestionScreen();
+            updateQuestionDisplay(data.question, data.question_number, data.total_questions);
+        });
+        
+        // Listen for next question
+        socket.on('next_question', function(data) {
+            currentQuestion = data.question_number - 1;
+            hasAnswered = false;
+            updateQuestionDisplay(data.question, data.question_number, data.total_questions);
+            enableAnswerButtons();
+        });
+        
+        // Listen for position updates
+        socket.on('position_update', function(data) {
+            if (data.positions[username] !== undefined) {
+                userPosition = data.positions[username];
+                updatePositionDisplay();
+            }
+        });
+        
+        // Listen for session finished
+        socket.on('session_finished', function(data) {
+            showThankYouScreen();
+        });
+        
+        function showQuestionScreen() {
+            document.getElementById('waitingScreen').style.display = 'none';
+            document.getElementById('questionScreen').style.display = 'block';
+            document.getElementById('thankYouScreen').style.display = 'none';
+        }
+        
+        function showThankYouScreen() {
+            document.getElementById('waitingScreen').style.display = 'none';
+            document.getElementById('questionScreen').style.display = 'none';
+            document.getElementById('thankYouScreen').style.display = 'block';
+        }
+        
+        function updateQuestionDisplay(question, questionNumber, totalQuestions) {
+            document.getElementById('questionText').textContent = question;
+            document.getElementById('questionNumber').textContent = `Question ${questionNumber} of ${totalQuestions}`;
+            
+            const progress = (questionNumber - 1) / totalQuestions * 100;
+            document.getElementById('progressFill').style.width = `${progress}%`;
+            document.getElementById('progressText').textContent = `${Math.round(progress)}% Complete`;
+        }
+        
+        function updatePositionDisplay() {
+            document.getElementById('positionValue').textContent = userPosition.toFixed(1);
+        }
+        
+        function enableAnswerButtons() {
+            document.getElementById('agreeButton').disabled = false;
+            document.getElementById('disagreeButton').disabled = false;
+        }
+        
+        function disableAnswerButtons() {
+            document.getElementById('agreeButton').disabled = true;
+            document.getElementById('disagreeButton').disabled = true;
+        }
+        
+        async function submitAnswer(answer) {
+            if (hasAnswered) return;
+            
+            hasAnswered = true;
+            disableAnswerButtons();
+            
+            try {
+                const response = await fetch('/api/submit_answer', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        session_id: sessionId,
+                        username: username,
+                        answer: answer
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (!data.success) {
+                    console.error('Error submitting answer:', data.error);
+                    // Re-enable buttons on error
+                    hasAnswered = false;
+                    enableAnswerButtons();
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                // Re-enable buttons on error
+                hasAnswered = false;
+                enableAnswerButtons();
+            }
+        }
+        
+        // Initialize position display
+        updatePositionDisplay();
+    </script>
+</body>
+</html> 

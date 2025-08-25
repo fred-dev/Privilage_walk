@@ -1,0 +1,66 @@
+{
+  "title": "Privilege Walk Questions",
+  "description": "Questions designed to help participants reflect on their privilege and position in society",
+  "questions": [
+    {
+      "id": 1,
+      "text": "I have rarely been judged negatively or discriminated against because of my body size.",
+      "category": "body_size"
+    },
+    {
+      "id": 2,
+      "text": "My mental health is generally robust, and it has never seriously limited my opportunities.",
+      "category": "mental_health"
+    },
+    {
+      "id": 3,
+      "text": "I am neurotypical, and my ways of thinking and learning are usually supported in school or work.",
+      "category": "neurodiversity"
+    },
+    {
+      "id": 4,
+      "text": "My sexuality has never caused me to be excluded, harassed, or made invisible.",
+      "category": "sexuality"
+    },
+    {
+      "id": 5,
+      "text": "I am able-bodied, and I do not face barriers to everyday activities, buildings, or services.",
+      "category": "physical_ability"
+    },
+    {
+      "id": 6,
+      "text": "I have access to post-secondary education and am likely to complete it.",
+      "category": "education"
+    },
+    {
+      "id": 7,
+      "text": "My skin colour has never caused me to be unfairly treated or stereotyped.",
+      "category": "race"
+    },
+    {
+      "id": 8,
+      "text": "I am a citizen or permanent resident and do not have to worry about losing my right to remain in this country.",
+      "category": "citizenship"
+    },
+    {
+      "id": 9,
+      "text": "My gender identity is cisgender and has never been a barrier to being accepted or respected.",
+      "category": "gender"
+    },
+    {
+      "id": 10,
+      "text": "English is my first or fluent language, and it has always been an advantage for me in education and society.",
+      "category": "language"
+    },
+    {
+      "id": 11,
+      "text": "I grew up in a family that was financially secure and could afford most of what we needed.",
+      "category": "financial"
+    },
+    {
+      "id": 12,
+      "text": "I have always had secure housing and have never been at risk of homelessness.",
+      "category": "housing"
+    }
+  ]
+} 
