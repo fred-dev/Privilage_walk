@@ -1,127 +1,128 @@
-from flask import Flask, render_template, request, jsonify, session, send_file, Response
+import os
 import json
 import uuid
-from datetime import datetime
-import os
-import qrcode
-from io import BytesIO
-import threading
 import time
+import logging
+from datetime import datetime
+from flask import Flask, render_template, request, jsonify, session, send_file, Response
+from io import BytesIO
+import qrcode
+
+# Configure comprehensive logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'your-secret-key-here'
+app.secret_key = 'your-secret-key-here'
 
-# Load questions from JSON file
-def load_questions():
-    try:
-        with open('questions.json', 'r') as f:
-            questions_data = json.load(f)
-            return [q['text'] for q in questions_data['questions']]
-    except FileNotFoundError:
-        # Fallback questions if file doesn't exist
-        return [
-            "I have rarely been judged negatively or discriminated against because of my body size.",
-            "My mental health is generally robust, and it has never seriously limited my opportunities.",
-            "I am neurotypical, and my ways of thinking and learning are usually supported in school or work.",
-            "My sexuality has never caused me to be excluded, harassed, or made invisible.",
-            "I am able-bodied, and I do not face barriers to everyday activities, buildings, or services.",
-            "I have access to post-secondary education and am likely to complete it.",
-            "My skin colour has never caused me to be unfairly treated or stereotyped.",
-            "I am a citizen or permanent resident and do not have to worry about losing my right to remain in this country.",
-            "My gender identity is cisgender and has never been a barrier to being accepted or respected.",
-            "English is my first or fluent language, and it has always been an advantage for me in education and society.",
-            "I grew up in a family that was financially secure and could afford most of what we needed.",
-            "I have always had secure housing and have never been at risk of homelessness."
-        ]
-
-# Store active sessions in memory (simple)
+# In-memory storage for active sessions
 active_sessions = {}
 
-# Load questions
-QUESTIONS = load_questions()
+def log_session_state(session_id, action, details=""):
+    """Log session state changes for debugging"""
+    session_info = active_sessions.get(session_id, {})
+    user_count = len(session_info.get('users', {}))
+    logger.info(f"SESSION {action}: {session_id} | Users: {user_count} | {details}")
+
+def notify_sse_clients(session_id, event_type, data):
+    """Notify all SSE clients in a session about an event"""
+    if session_id in active_sessions:
+        # Add event to pending events
+        if 'pending_events' not in active_sessions[session_id]:
+            active_sessions[session_id]['pending_events'] = []
+
+        active_sessions[session_id]['pending_events'].append({
+            'type': event_type,
+            'data': data,
+            'timestamp': datetime.now().isoformat()
+        })
+        
+        logger.info(f"SSE Event queued: {session_id} | {event_type} | {data}")
 
 @app.route('/')
 def index():
-    """Main page to create a new session"""
-    # Add a simple health check response for Render
+    """Main page for creating sessions"""
+    # Check if this is a Render health check
     user_agent = request.headers.get('User-Agent', '')
     if 'Render' in user_agent:
-        return jsonify({'status': 'healthy', 'message': 'Privilege Walk app is running'})
+        return jsonify({'status': 'healthy', 'timestamp': datetime.now().isoformat()})
+    
     return render_template('index.html')
-
-@app.route('/health')
-def health_check():
-    """Health check endpoint for Render - optimized for speed"""
-    try:
-        # Super fast response - no database queries or heavy operations
-        return jsonify({
-            'status': 'healthy',
-            'timestamp': datetime.now().isoformat(),
-            'sessions_count': len(active_sessions),
-            'uptime': 'running'
-        })
-    except Exception as e:
-        # Even if there's an error, return quickly
-        return jsonify({
-            'status': 'error',
-            'error': str(e),
-            'timestamp': datetime.now().isoformat()
-        }), 500
 
 @app.route('/create_session', methods=['POST'])
 def create_session():
     """Create a new session"""
-    session_name = request.form.get('session_name', 'Privilege Walk')
     session_id = str(uuid.uuid4())[:8]
     
+    # Initialize session data
     active_sessions[session_id] = {
-        'name': session_name,
         'users': {},
         'status': 'waiting',
         'current_question': 0,
-        'created_at': datetime.now(),
+        'questions': load_questions(),
         'pending_events': []
     }
     
-    return jsonify({'session_id': session_id, 'redirect_url': f'/instructor/{session_id}'})
+    log_session_state(session_id, "CREATED")
+    return jsonify({'session_id': session_id})
 
 @app.route('/instructor/<session_id>')
 def instructor_view(session_id):
-    """Instructor view for managing a session"""
+    """Instructor view for a session"""
     if session_id not in active_sessions:
         return "Session not found", 404
     
-    session_data = active_sessions[session_id]
+    log_session_state(session_id, "INSTRUCTOR_VIEW_ACCESSED")
+    return render_template('instructor.html', session_id=session_id)
+
+@app.route('/join/<session_id>')
+def student_join(session_id):
+    """Student join page"""
+    if session_id not in active_sessions:
+        logger.error(f"Student join attempt for non-existent session: {session_id}")
+        return "Session not found", 404
     
-    # Simple QR code URL for Render
-    qr_url = f"https://privilage-walk.onrender.com/join/{session_id}"
+    log_session_state(session_id, "STUDENT_JOIN_PAGE_ACCESSED")
+    return render_template('student_join.html', session_id=session_id)
+
+@app.route('/student/<session_id>')
+def student_view(session_id):
+    """Student view for a session"""
+    if session_id not in active_sessions:
+        logger.error(f"Student view attempt for non-existent session: {session_id}")
+        return "Session not found", 404
     
-    return render_template('instructor.html', 
-                          session_id=session_id, 
-                          session_name=session_data['name'],
-                          qr_url=qr_url,
-                          network_ip="Render")
+    username = request.args.get('username', 'Anonymous')
+    
+    # Add user to session
+    if session_id in active_sessions:
+        active_sessions[session_id]['users'][username] = {
+            'joined_at': datetime.now().isoformat(),
+            'answers': [],
+            'position': 0
+        }
+        
+        log_session_state(session_id, "STUDENT_JOINED", f"Username: {username}")
+        
+        # Notify instructor about new user
+        notify_sse_clients(session_id, 'user_joined', {'username': username})
+    
+    return render_template('student.html', session_id=session_id, username=username)
 
 @app.route('/qr/<session_id>')
-def generate_qr_code(session_id):
-    """Generate QR code for session joining"""
+def qr_code(session_id):
+    """Generate QR code for session"""
     if session_id not in active_sessions:
         return "Session not found", 404
     
-    # Simple QR code URL for Render
-    qr_url = f"https://privilage-walk.onrender.com/join/{session_id}"
-    
-    # Generate QR code
-    qr = qrcode.QRCode(
-        version=1,
-        error_correction=qrcode.constants.ERROR_CORRECT_L,
-        box_size=10,
-        border=4,
-    )
-    qr.add_data(qr_url)
+    # Create QR code pointing to the Render domain
+    qr = qrcode.QRCode(version=1, box_size=10, border=5)
+    qr.add_data(f'https://privilage-walk.onrender.com/join/{session_id}')
     qr.make(fit=True)
     
-    # Create QR code image
     img = qr.make_image(fill_color="black", back_color="white")
     
     # Convert to bytes
@@ -131,221 +132,231 @@ def generate_qr_code(session_id):
     
     return send_file(img_io, mimetype='image/png')
 
-@app.route('/join/<session_id>')
-def join_session_page(session_id):
-    """Page for students to join a session"""
-    if session_id not in active_sessions:
-        return "Session not found", 404
-    
-    return render_template('student_join.html', session_id=session_id)
-
 @app.route('/api/join_session', methods=['POST'])
 def api_join_session():
-    """API endpoint for students to join a session"""
-    session_id = request.form.get('session_id')
-    username = request.form.get('username')
+    """API endpoint for joining a session"""
+    data = request.get_json()
+    session_id = data.get('session_id')
+    username = data.get('username')
     
     if not session_id or not username:
-        return jsonify({'success': False, 'error': 'Missing session_id or username'}), 400
+        return jsonify({'error': 'Missing session_id or username'}), 400
     
     if session_id not in active_sessions:
-        return jsonify({'success': False, 'error': 'Session not found'}), 404
-    
-    if active_sessions[session_id]['status'] != 'waiting':
-        return jsonify({'success': False, 'error': 'Session already started'}), 400
+        logger.error(f"API join attempt for non-existent session: {session_id}")
+        return jsonify({'error': 'Session not found'}), 404
     
     # Add user to session
     active_sessions[session_id]['users'][username] = {
-        'position': 0,
-        'current_question': 0,
-        'joined_at': datetime.now()
+        'joined_at': datetime.now().isoformat(),
+        'answers': [],
+        'position': 0
     }
     
-    # Notify all SSE clients about user join
-    notify_sse_clients(session_id, 'user_joined', {
-        'username': username,
-        'user_count': len(active_sessions[session_id]['users'])
-    })
+    log_session_state(session_id, "API_JOIN", f"Username: {username}")
     
-    return jsonify({'success': True, 'redirect_url': f'/student/{session_id}?username={username}'})
-
-@app.route('/student/<session_id>')
-def student_view(session_id):
-    """Student view for answering questions"""
-    username = request.args.get('username')
+    # Notify all clients about new user
+    notify_sse_clients(session_id, 'user_joined', {'username': username})
     
-    if not username:
-        return "Username required", 400
-    
-    if session_id not in active_sessions:
-        return "Session not found", 404
-    
-    if username not in active_sessions[session_id]['users']:
-        return "User not in session", 400
-    
-    return render_template('student.html', 
-                          session_id=session_id, 
-                          username=username,
-                          questions=QUESTIONS)
+    return jsonify({'success': True, 'session_id': session_id})
 
 @app.route('/api/start_session', methods=['POST'])
 def api_start_session():
     """Start the privilege walk session"""
-    session_id = request.form.get('session_id')
+    data = request.get_json()
+    session_id = data.get('session_id')
     
     if not session_id or session_id not in active_sessions:
-        return jsonify({'success': False, 'error': 'Invalid session'}), 400
+        return jsonify({'error': 'Invalid session'}), 400
     
     session_data = active_sessions[session_id]
-    
-    if len(session_data['users']) == 0:
-        return jsonify({'success': False, 'error': 'No users in session'}), 400
-    
     session_data['status'] = 'active'
     session_data['current_question'] = 0
     
-    print(f"✅ Session {session_id} started with {len(session_data['users'])} users")
+    log_session_state(session_id, "STARTED")
     
-    # Notify all clients via SSE
+    # Get first question
+    questions = session_data['questions']
+    first_question = questions[0] if questions else "No questions available"
+    
+    # Notify all clients that session has started
     notify_sse_clients(session_id, 'session_started', {
-        'question': QUESTIONS[0],
+        'question': first_question,
         'question_number': 1,
-        'total_questions': len(QUESTIONS)
+        'total_questions': len(questions)
     })
     
     return jsonify({'success': True})
 
 @app.route('/api/submit_answer', methods=['POST'])
 def api_submit_answer():
-    """Submit a student's answer to a question"""
-    session_id = request.form.get('session_id')
-    username = request.form.get('username')
-    answer = request.form.get('answer')  # 'agree' or 'disagree'
+    """Submit a student's answer"""
+    data = request.get_json()
+    session_id = data.get('session_id')
+    username = data.get('username')
+    answer = data.get('answer')
     
     if not all([session_id, username, answer]):
-        return jsonify({'success': False, 'error': 'Missing parameters'}), 400
+        return jsonify({'error': 'Missing required fields'}), 400
     
     if session_id not in active_sessions:
-        return jsonify({'success': False, 'error': 'Session not found'}), 404
+        logger.error(f"Answer submission for non-existent session: {session_id}")
+        return jsonify({'error': 'Session not found'}), 404
     
     session_data = active_sessions[session_id]
     
     if username not in session_data['users']:
-        return jsonify({'success': False, 'error': 'User not in session'}), 400
+        return jsonify({'error': 'User not in session'}), 400
     
-    if session_data['status'] != 'active':
-        return jsonify({'success': False, 'error': 'Session not active'}), 400
-    
+    # Record answer
     user_data = session_data['users'][username]
-    current_q = session_data['current_question']
+    user_data['answers'].append(answer)
     
-    if user_data['current_question'] != current_q:
-        return jsonify({'success': False, 'error': 'Question already answered'}), 400
-    
-    # Update user's position based on answer
+    # Update position based on answer
     if answer == 'agree':
         user_data['position'] += 1
     elif answer == 'disagree':
         user_data['position'] -= 1
     
-    user_data['current_question'] = current_q + 1
+    log_session_state(session_id, "ANSWER_SUBMITTED", f"User: {username}, Answer: {answer}, Position: {user_data['position']}")
     
-    # Check if all users have answered this question
-    all_answered = all(user['current_question'] > current_q for user in session_data['users'].values())
+    # Check if all users have answered
+    all_answered = all(len(user['answers']) > session_data['current_question'] 
+                       for user in session_data['users'].values())
     
     if all_answered:
         # Move to next question
         session_data['current_question'] += 1
+        questions = session_data['questions']
         
-        if session_data['current_question'] >= len(QUESTIONS):
-            # All questions answered
-            session_data['status'] = 'finished'
-            notify_sse_clients(session_id, 'session_finished', {
-                'final_positions': {username: user_data['position'] 
-                                  for username, user_data in session_data['users'].items()}
-            })
-        else:
+        if session_data['current_question'] < len(questions):
             # Next question
-            next_q = session_data['current_question']
+            next_question = questions[session_data['current_question']]
             notify_sse_clients(session_id, 'next_question', {
-                'question': QUESTIONS[next_q],
-                'question_number': next_q + 1,
-                'total_questions': len(QUESTIONS)
+                'question': next_question,
+                'question_number': session_data['current_question'] + 1,
+                'total_questions': len(questions)
             })
+            
+            # Reset answers for next question
+            for user in session_data['users'].values():
+                user['answers'] = user['answers'][:session_data['current_question']]
+        else:
+            # Session finished
+            session_data['status'] = 'finished'
+            final_positions = {username: user['position'] for username, user in session_data['users'].items()}
+            
+            notify_sse_clients(session_id, 'session_finished', {
+                'final_positions': final_positions
+            })
+            
+            log_session_state(session_id, "FINISHED", f"Final positions: {final_positions}")
     
-    # Update positions for all clients
-    positions = {username: user_data['position'] for username, user_data in session_data['users'].items()}
+    # Send position update
+    positions = {username: user['position'] for username, user in session_data['users'].items()}
     notify_sse_clients(session_id, 'position_update', {'positions': positions})
-    
-    return jsonify({'success': True, 'all_answered': all_answered})
-
-@app.route('/api/reset_session', methods=['POST'])
-def api_reset_session():
-    """Reset a session to allow new students to join"""
-    session_id = request.form.get('session_id')
-    
-    if not session_id or session_id not in active_sessions:
-        return jsonify({'success': False, 'error': 'Invalid session'}), 400
-    
-    # Reset session
-    active_sessions[session_id]['status'] = 'waiting'
-    active_sessions[session_id]['current_question'] = 0
-    active_sessions[session_id]['users'] = {}
-    
-    # Notify all clients via SSE
-    notify_sse_clients(session_id, 'session_reset', {})
     
     return jsonify({'success': True})
 
-def notify_sse_clients(session_id, event_type, data):
-    """Notify all SSE clients in a session about an event"""
-    if session_id in active_sessions:
-        # Add event to pending events
-        if 'pending_events' not in active_sessions[session_id]:
-            active_sessions[session_id]['pending_events'] = []
-        
-        active_sessions[session_id]['pending_events'].append({
-            'type': event_type,
-            'data': data,
-            'timestamp': datetime.now().isoformat()
-        })
+@app.route('/api/reset_session', methods=['POST'])
+def api_reset_session():
+    """Reset a session to start over"""
+    data = request.get_json()
+    session_id = data.get('session_id')
+    
+    if not session_id or session_id not in active_sessions:
+        return jsonify({'error': 'Invalid session'}), 400
+    
+    # Reset session data
+    session_data = active_sessions[session_id]
+    session_data['status'] = 'waiting'
+    session_data['current_question'] = 0
+    
+    # Reset user data
+    for user in session_data['users'].values():
+        user['answers'] = []
+        user['position'] = 0
+    
+    # Clear pending events
+    session_data['pending_events'] = []
+    
+    log_session_state(session_id, "RESET")
+    
+    # Notify all clients about reset
+    notify_sse_clients(session_id, 'session_reset', {})
+    
+    return jsonify({'success': True})
 
 @app.route('/stream/<session_id>')
 def stream(session_id):
     """SSE stream endpoint for real-time updates"""
     if session_id not in active_sessions:
+        logger.error(f"SSE stream attempt for non-existent session: {session_id}")
         return "Session not found", 404
-    
+
+    logger.info(f"SSE stream started for session: {session_id}")
+
     def generate():
-        # Send initial connection message
-        yield f"data: {json.dumps({'type': 'connected', 'session_id': session_id})}\n\n"
-        
-        # Keep track of last event sent
-        last_event_index = 0
-        
-        # Keep connection alive and check for new events
-        while True:
-            try:
-                # Check for new events
-                if 'pending_events' in active_sessions[session_id]:
-                    events = active_sessions[session_id]['pending_events']
-                    while last_event_index < len(events):
-                        event = events[last_event_index]
-                        yield f"data: {json.dumps(event)}\n\n"
-                        last_event_index += 1
-                
-                # Send a simple keepalive without blocking
-                yield f"data: {json.dumps({'type': 'keepalive', 'timestamp': datetime.now().isoformat()})}\n\n"
-                
-                # Use a very short sleep to avoid blocking the worker
-                time.sleep(1)
-                
-            except GeneratorExit:
-                break
-    
+        try:
+            # Send initial connection message
+            yield f"data: {json.dumps({'type': 'connected', 'session_id': session_id})}\n\n"
+            logger.info(f"SSE connection established for session: {session_id}")
+
+            # Keep track of last event sent
+            last_event_index = 0
+
+            # Keep connection alive and check for new events
+            while True:
+                try:
+                    # Check for new events
+                    if 'pending_events' in active_sessions[session_id]:
+                        events = active_sessions[session_id]['pending_events']
+                        while last_event_index < len(events):
+                            event = events[last_event_index]
+                            yield f"data: {json.dumps(event)}\n\n"
+                            last_event_index += 1
+                            logger.debug(f"SSE event sent: {session_id} | {event['type']}")
+
+                    # Send a simple keepalive without blocking
+                    yield f"data: {json.dumps({'type': 'keepalive', 'timestamp': datetime.now().isoformat()})}\n\n"
+
+                    # Use a very short sleep to avoid blocking the worker
+                    time.sleep(1)
+
+                except GeneratorExit:
+                    logger.info(f"SSE stream closed by client for session: {session_id}")
+                    break
+                except Exception as e:
+                    logger.error(f"SSE stream error for session {session_id}: {str(e)}")
+                    break
+
+        except Exception as e:
+            logger.error(f"SSE stream generation error for session {session_id}: {str(e)}")
+
     return Response(generate(), mimetype='text/event-stream')
 
+@app.route('/health')
+def health_check():
+    """Health check endpoint for Render"""
+    return jsonify({
+        'status': 'healthy',
+        'timestamp': datetime.now().isoformat(),
+        'active_sessions': len(active_sessions),
+        'total_users': sum(len(session.get('users', {})) for session in active_sessions.values())
+    })
+
+def load_questions():
+    """Load questions from JSON file"""
+    try:
+        with open('questions.json', 'r') as f:
+            questions = json.load(f)
+            logger.info(f"Loaded {len(questions)} questions from questions.json")
+            return questions
+    except Exception as e:
+        logger.error(f"Error loading questions: {str(e)}")
+        return ["Sample question 1", "Sample question 2"]
+
 if __name__ == '__main__':
-    # Simple port binding for Render
     port = int(os.environ.get('PORT', 5001))
-    app.run(debug=False, host='0.0.0.0', port=port) 
+    logger.info(f"Starting Flask app on port {port}")
+    app.run(host='0.0.0.0', port=port, debug=False) 

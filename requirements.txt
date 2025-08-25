@@ -1,5 +1,11 @@
-# Updated for Python 3.13 compatibility - using flexible version ranges
-Flask>=3.0.0
-qrcode>=7.4.0
-Pillow>=10.4.0
-gunicorn>=21.2.0 
+# Core Flask application
+Flask>=3.0.0,<4.0.0
+
+# QR code generation
+qrcode>=7.4.0,<8.0.0
+
+# Image processing for QR codes
+Pillow>=10.0.0,<11.0.0
+
+# Production WSGI server
+gunicorn>=21.2.0,<22.0.0 
