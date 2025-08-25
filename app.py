@@ -1,15 +1,15 @@
-from flask import Flask, render_template, request, jsonify, session, send_file
-from flask_socketio import SocketIO, emit, join_room, leave_room
+from flask import Flask, render_template, request, jsonify, session, send_file, Response
 import json
 import uuid
 from datetime import datetime
 import os
 import qrcode
 from io import BytesIO
+import threading
+import time
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your-secret-key-here'
-socketio = SocketIO(app, cors_allowed_origins="*")
 
 # Load questions from JSON file
 def load_questions():
@@ -37,8 +37,17 @@ def load_questions():
 # Store active sessions in memory (simple)
 active_sessions = {}
 
+# Store SSE clients for each session
+sse_clients = {}
+
 # Load questions
 QUESTIONS = load_questions()
+
+def send_sse_event(event_type, data, session_id):
+    """Send SSE event to all clients in a session"""
+    if session_id in sse_clients:
+        # This will be handled by the SSE stream endpoint
+        pass
 
 @app.route('/')
 def index():
@@ -81,6 +90,9 @@ def create_session():
         'current_question': 0,
         'created_at': datetime.now()
     }
+    
+    # Initialize SSE clients list for this session
+    sse_clients[session_id] = []
     
     return jsonify({'session_id': session_id, 'redirect_url': f'/instructor/{session_id}'})
 
@@ -160,11 +172,11 @@ def api_join_session():
         'joined_at': datetime.now()
     }
     
-    # Notify instructor view
-    socketio.emit('user_joined', {
+    # Notify all SSE clients about user join
+    notify_sse_clients(session_id, 'user_joined', {
         'username': username,
         'user_count': len(active_sessions[session_id]['users'])
-    }, room=f'instructor_{session_id}')
+    })
     
     return jsonify({'success': True, 'redirect_url': f'/student/{session_id}?username={username}'})
 
@@ -205,19 +217,12 @@ def api_start_session():
     
     print(f"✅ Session {session_id} started with {len(session_data['users'])} users")
     
-    # Notify all clients
-    socketio.emit('session_started', {
+    # Notify all clients via SSE
+    notify_sse_clients(session_id, 'session_started', {
         'question': QUESTIONS[0],
         'question_number': 1,
         'total_questions': len(QUESTIONS)
-    }, room=f'session_{session_id}')
-    
-    # Also notify the instructor
-    socketio.emit('session_started', {
-        'question': QUESTIONS[0],
-        'question_number': 1,
-        'total_questions': len(QUESTIONS)
-    }, room=f'instructor_{session_id}')
+    })
     
     return jsonify({'success': True})
 
@@ -266,36 +271,22 @@ def api_submit_answer():
         if session_data['current_question'] >= len(QUESTIONS):
             # All questions answered
             session_data['status'] = 'finished'
-            socketio.emit('session_finished', {
+            notify_sse_clients(session_id, 'session_finished', {
                 'final_positions': {username: user_data['position'] 
                                   for username, user_data in session_data['users'].items()}
-            }, room=f'session_{session_id}')
-            
-            # Also notify the instructor
-            socketio.emit('session_finished', {
-                'final_positions': {username: user_data['position'] 
-                                  for username, user_data in session_data['users'].items()}
-            }, room=f'instructor_{session_id}')
+            })
         else:
             # Next question
             next_q = session_data['current_question']
-            socketio.emit('next_question', {
+            notify_sse_clients(session_id, 'next_question', {
                 'question': QUESTIONS[next_q],
                 'question_number': next_q + 1,
                 'total_questions': len(QUESTIONS)
-            }, room=f'session_{session_id}')
-            
-            # Also notify the instructor
-            socketio.emit('next_question', {
-                'question': QUESTIONS[next_q],
-                'question_number': next_q + 1,
-                'total_questions': len(QUESTIONS)
-            }, room=f'instructor_{session_id}')
+            })
     
     # Update positions for all clients
     positions = {username: user_data['position'] for username, user_data in session_data['users'].items()}
-    socketio.emit('position_update', {'positions': positions}, room=f'session_{session_id}')
-    socketio.emit('position_update', {'positions': positions}, room=f'instructor_{session_id}')
+    notify_sse_clients(session_id, 'position_update', {'positions': positions})
     
     return jsonify({'success': True, 'all_answered': all_answered})
 
@@ -312,38 +303,58 @@ def api_reset_session():
     active_sessions[session_id]['current_question'] = 0
     active_sessions[session_id]['users'] = {}
     
-    # Notify all clients
-    socketio.emit('session_reset', {}, room=f'session_{session_id}')
-    socketio.emit('session_reset', {}, room=f'instructor_{session_id}')
+    # Notify all clients via SSE
+    notify_sse_clients(session_id, 'session_reset', {})
     
     return jsonify({'success': True})
 
-# WebSocket events
-@socketio.on('join_instructor')
-def on_join_instructor(data):
-    """Instructor joins the instructor room"""
-    session_id = data.get('session_id')
-    if session_id:
-        join_room(f'instructor_{session_id}')
-        print(f"👨‍🏫 Instructor joined session {session_id}")
+def notify_sse_clients(session_id, event_type, data):
+    """Notify all SSE clients in a session about an event"""
+    if session_id in sse_clients:
+        # Mark the session as having pending events
+        if 'pending_events' not in active_sessions[session_id]:
+            active_sessions[session_id]['pending_events'] = []
+        
+        active_sessions[session_id]['pending_events'].append({
+            'type': event_type,
+            'data': data,
+            'timestamp': datetime.now().isoformat()
+        })
 
-@socketio.on('join_student')
-def on_join_student(data):
-    """Student joins the student room"""
-    session_id = data.get('session_id')
-    if session_id:
-        join_room(f'session_{session_id}')
-        print(f"👤 Student joined session {session_id}")
-
-@socketio.on('disconnect')
-def on_disconnect():
-    """Handle client disconnect"""
-    print("Client disconnected")
+@app.route('/stream/<session_id>')
+def stream(session_id):
+    """SSE stream endpoint for real-time updates"""
+    if session_id not in active_sessions:
+        return "Session not found", 404
+    
+    def generate():
+        # Send initial connection message
+        yield f"data: {json.dumps({'type': 'connected', 'session_id': session_id})}\n\n"
+        
+        # Keep track of last event sent
+        last_event_index = 0
+        
+        # Keep connection alive with periodic heartbeats and check for new events
+        while True:
+            try:
+                # Check for new events
+                if 'pending_events' in active_sessions[session_id]:
+                    events = active_sessions[session_id]['pending_events']
+                    while last_event_index < len(events):
+                        event = events[last_event_index]
+                        yield f"data: {json.dumps(event)}\n\n"
+                        last_event_index += 1
+                
+                # Send heartbeat every 30 seconds
+                yield f"data: {json.dumps({'type': 'heartbeat', 'timestamp': datetime.now().isoformat()})}\n\n"
+                time.sleep(30)
+                
+            except GeneratorExit:
+                break
+    
+    return Response(generate(), mimetype='text/event-stream')
 
 if __name__ == '__main__':
     # Simple port binding for Render
     port = int(os.environ.get('PORT', 5001))
-    socketio.run(app, 
-                debug=False, 
-                host='0.0.0.0', 
-                port=port) 
+    app.run(debug=False, host='0.0.0.0', port=port) 

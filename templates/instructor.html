@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Privilege Walk - Instructor View</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -100,120 +99,60 @@
             text-align: left;
         }
         
-        .qr-instructions h3 {
-            margin: 0 0 1rem 0;
-            color: #333;
-            font-size: 1.2rem;
-            text-align: center;
-        }
-        
         .qr-instructions ol {
+            text-align: left;
             margin: 0;
             padding-left: 1.5rem;
-            color: #555;
-            line-height: 1.6;
         }
         
         .qr-instructions li {
-            margin-bottom: 0.5rem;
+            margin: 0.5rem 0;
+            color: #555;
         }
         
         .qr-code {
-            margin: 0 auto;
-            text-align: center;
+            margin: 1rem 0;
         }
         
         .qr-controls {
-            margin-top: 1rem;
+            margin: 1rem 0;
         }
         
         .refresh-btn {
-            background: #6c757d;
+            background: #667eea;
             color: white;
             border: none;
-            padding: 0.5rem 1rem;
-            border-radius: 5px;
-            font-size: 0.9rem;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
             cursor: pointer;
-            transition: background-color 0.2s ease;
+            font-size: 1rem;
         }
         
         .refresh-btn:hover {
-            background: #5a6268;
+            background: #5a6fd8;
         }
         
         .join-url {
-            margin-top: 1rem;
-            padding: 0.5rem;
             background: #f8f9fa;
-            border-radius: 5px;
+            padding: 1rem;
+            border-radius: 8px;
             font-family: monospace;
+            font-size: 0.9rem;
+            color: #666;
+            margin: 1rem 0;
             word-break: break-all;
         }
         
         .debug-info {
-            margin-top: 0.5rem;
-            text-align: center;
-            color: #666;
             font-size: 0.8rem;
-        }
-        
-        .debug-info code {
-            background: #e9ecef;
-            padding: 0.2rem 0.4rem;
-            border-radius: 3px;
-            font-family: monospace;
-        }
-        
-        .user-count {
-            font-size: 3rem;
-            font-weight: bold;
-            color: #667eea;
-            margin: 1rem 0;
-        }
-        
-        .user-list {
-            text-align: left;
-            max-height: 300px;
-            overflow-y: auto;
-        }
-        
-        .user-item {
-            padding: 0.5rem;
-            margin: 0.25rem 0;
-            background: #f8f9fa;
-            border-radius: 5px;
-            border-left: 4px solid #667eea;
-        }
-        
-        .go-button {
-            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
-            color: white;
-            border: none;
-            padding: 1rem 3rem;
-            border-radius: 10px;
-            font-size: 1.5rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: transform 0.2s ease;
-            margin: 1rem 0;
-            width: 100%;
-        }
-        
-        .go-button:hover:not(:disabled) {
-            transform: translateY(-2px);
-        }
-        
-        .go-button:disabled {
-            background: #6c757d;
-            cursor: not-allowed;
+            color: #888;
+            margin-top: 1rem;
         }
         
         .status {
             padding: 1rem;
-            border-radius: 10px;
+            border-radius: 8px;
             margin: 1rem 0;
-            text-align: center;
             font-weight: 600;
         }
         
@@ -224,39 +163,77 @@
         }
         
         .status.active {
-            background: #d1ecf1;
-            color: #0c5460;
-            border: 1px solid #bee5eb;
-        }
-        
-        .status.finished {
             background: #d4edda;
             color: #155724;
             border: 1px solid #c3e6cb;
         }
         
-        .testing-note {
-            background: #fff3cd;
-            border: 1px solid #ffeaa7;
-            border-radius: 8px;
-            padding: 1rem;
-            margin: 1rem 0;
-            text-align: center;
+        .status.finished {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
         }
         
-        .testing-note p {
-            margin: 0;
-            color: #856404;
-            font-size: 0.9rem;
+        .testing-note {
+            background: #e7f3ff;
+            padding: 1rem;
+            border-radius: 8px;
+            margin: 1rem 0;
+            border-left: 4px solid #007bff;
+        }
+        
+        .user-count {
+            font-size: 3rem;
+            font-weight: bold;
+            color: #667eea;
+            margin: 1rem 0;
+        }
+        
+        .go-button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 1rem 2rem;
+            border-radius: 10px;
+            font-size: 1.2rem;
+            font-weight: 600;
+            cursor: pointer;
+            margin: 1rem 0;
+            transition: all 0.3s ease;
+        }
+        
+        .go-button:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+        
+        .go-button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        
+        .user-list {
+            margin-top: 1rem;
+        }
+        
+        .user-item {
+            background: #f8f9fa;
+            padding: 1rem;
+            margin: 0.5rem 0;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
         }
         
         .privilege-walk-view {
             display: none;
+            max-width: 1200px;
+            margin: 0 auto;
             background: white;
             padding: 2rem;
             border-radius: 15px;
             box-shadow: 0 5px 15px rgba(0,0,0,0.1);
-            margin-top: 2rem;
         }
         
         .walk-header {
@@ -264,138 +241,131 @@
             justify-content: space-between;
             align-items: center;
             margin-bottom: 2rem;
+            padding-bottom: 1rem;
+            border-bottom: 2px solid #eee;
         }
         
         .back-btn {
             background: #6c757d;
             color: white;
             border: none;
-            padding: 0.5rem 1rem;
-            border-radius: 5px;
-            font-size: 0.9rem;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
             cursor: pointer;
-            transition: background-color 0.2s ease;
+            font-size: 1rem;
         }
         
-        .back-btn:hover {
-            background: #5a6268;
+        .question-display {
+            text-align: center;
+            margin-bottom: 2rem;
+            padding: 2rem;
+            background: #f8f9fa;
+            border-radius: 10px;
+        }
+        
+        .question-text {
+            font-size: 1.5rem;
+            color: #333;
+            margin-bottom: 1rem;
+            font-weight: 600;
+        }
+        
+        .question-progress {
+            color: #666;
+            font-size: 1.1rem;
         }
         
         .walk-container {
             position: relative;
             height: 600px;
-            border: 2px solid #ddd;
+            background: linear-gradient(to bottom, #e8f5e8 0%, #f0f8f0 50%, #f8e8e8 100%);
             border-radius: 10px;
-            background: linear-gradient(to bottom, #e8f5e8 0%, #f0f0f0 50%, #ffe8e8 100%);
-            overflow: hidden;
+            border: 2px solid #ddd;
+            margin: 2rem 0;
         }
         
         .user-marker {
             position: absolute;
-            width: 120px;
-            height: 60px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: #667eea;
             color: white;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 10px;
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
             font-weight: 600;
             text-align: center;
+            min-width: 120px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
             transition: top 0.5s ease;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-        }
-        
-        .question-display {
-            text-align: center;
-            margin: 1rem 0;
-            padding: 1rem;
-            background: #f8f9fa;
-            border-radius: 10px;
-            border-left: 4px solid #667eea;
-        }
-        
-        .question-text {
-            font-size: 1.2rem;
-            color: #333;
-            margin-bottom: 0.5rem;
-        }
-        
-        .question-progress {
-            color: #666;
-            font-size: 0.9rem;
         }
         
         .final-results {
             display: none;
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 2rem;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
             text-align: center;
-            margin-top: 2rem;
         }
         
         .final-positions {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
             gap: 1rem;
-            margin-top: 1rem;
+            margin: 2rem 0;
         }
         
         .position-card {
             background: #f8f9fa;
-            padding: 1rem;
+            padding: 1.5rem;
             border-radius: 10px;
             border-left: 4px solid #667eea;
         }
         
         .position-rank {
-            font-size: 1.5rem;
+            font-size: 2rem;
             font-weight: bold;
             color: #667eea;
+            margin-bottom: 0.5rem;
         }
         
         .position-name {
+            font-size: 1.2rem;
             font-weight: 600;
             color: #333;
+            margin-bottom: 0.5rem;
         }
         
         .position-value {
             color: #666;
-            font-size: 0.9rem;
         }
         
         .session-actions {
-            margin-top: 3rem;
-            text-align: center;
-        }
-        
-        .session-actions h3 {
-            margin-bottom: 2rem;
-            color: #333;
+            margin-top: 2rem;
+            padding-top: 2rem;
+            border-top: 2px solid #eee;
         }
         
         .action-buttons {
             display: flex;
-            flex-direction: column;
             gap: 1rem;
-            max-width: 400px;
-            margin: 0 auto;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-top: 1rem;
         }
         
         .action-btn {
-            padding: 1rem 1.5rem;
+            padding: 1rem 2rem;
             border: none;
-            border-radius: 10px;
+            border-radius: 8px;
             font-size: 1rem;
             font-weight: 600;
             cursor: pointer;
-            transition: transform 0.2s ease;
-        }
-        
-        .action-btn:hover {
-            transform: translateY(-2px);
+            transition: all 0.3s ease;
         }
         
         .reset-btn {
-            background: linear-gradient(135deg, #ffc107 0%, #ff9800 100%);
+            background: linear-gradient(135deg, #ffc107 0%, #fd7e14 100%);
             color: white;
         }
         
@@ -524,48 +494,95 @@
 
     <script>
         const sessionId = '{{ session_id }}';
-        const socket = io();
         
         let users = {};
         let sessionStatus = 'waiting';
+        let eventSource = null;
         
-        // Join instructor room
-        socket.emit('join_instructor', { session_id: sessionId });
+        // Initialize SSE connection
+        function initSSE() {
+            if (eventSource) {
+                eventSource.close();
+            }
+            
+            eventSource = new EventSource(`/stream/${sessionId}`);
+            
+            eventSource.onmessage = function(event) {
+                try {
+                    const data = JSON.parse(event.data);
+                    handleSSEEvent(data);
+                } catch (error) {
+                    console.error('Error parsing SSE data:', error);
+                }
+            };
+            
+            eventSource.onerror = function(error) {
+                console.error('SSE connection error:', error);
+                // Reconnect after 5 seconds
+                setTimeout(initSSE, 5000);
+            };
+        }
         
-        // Listen for user joins
-        socket.on('user_joined', function(data) {
-            users[data.username] = { joined_at: new Date() };
-            updateUserCount();
-            updateUserList();
-            updateGoButton();
-        });
+        // Handle SSE events
+        function handleSSEEvent(data) {
+            console.log('SSE Event received:', data);
+            
+            switch(data.type) {
+                case 'user_joined':
+                    users[data.data.username] = { joined_at: new Date() };
+                    updateUserCount();
+                    updateUserList();
+                    updateGoButton();
+                    break;
+                    
+                case 'session_started':
+                    console.log('🎯 SESSION STARTED EVENT RECEIVED!', data.data);
+                    sessionStatus = 'active';
+                    updateStatus();
+                    console.log('About to call showPrivilegeWalkView()...');
+                    showPrivilegeWalkView();
+                    updateQuestionDisplay(data.data.question, data.data.question_number, data.data.total_questions);
+                    createUserMarkers();
+                    break;
+                    
+                case 'next_question':
+                    updateQuestionDisplay(data.data.question, data.data.question_number, data.data.total_questions);
+                    break;
+                    
+                case 'position_update':
+                    updateUserPositions(data.data.positions);
+                    break;
+                    
+                case 'session_finished':
+                    sessionStatus = 'finished';
+                    updateStatus();
+                    showFinalResults(data.data.final_positions);
+                    break;
+                    
+                case 'session_reset':
+                    // Handle session reset
+                    sessionStatus = 'waiting';
+                    updateStatus();
+                    showMainView();
+                    users = {};
+                    updateUserCount();
+                    updateUserList();
+                    updateGoButton();
+                    break;
+                    
+                case 'connected':
+                    console.log('SSE connection established');
+                    break;
+                    
+                case 'heartbeat':
+                    // Keep connection alive
+                    break;
+            }
+        }
         
-        // Listen for session start
-        socket.on('session_started', function(data) {
-            console.log('🎯 SESSION STARTED EVENT RECEIVED!', data);
-            sessionStatus = 'active';
-            updateStatus();
-            console.log('About to call showPrivilegeWalkView()...');
-            showPrivilegeWalkView();
-            updateQuestionDisplay(data.question, data.question_number, data.total_questions);
-            createUserMarkers();
-        });
-        
-        // Listen for next question
-        socket.on('next_question', function(data) {
-            updateQuestionDisplay(data.question, data.question_number, data.total_questions);
-        });
-        
-        // Listen for position updates
-        socket.on('position_update', function(data) {
-            updateUserPositions(data.positions);
-        });
-        
-        // Listen for session finished
-        socket.on('session_finished', function(data) {
-            sessionStatus = 'finished';
-            updateStatus();
-            showFinalResults(data.final_positions);
+        // Initialize SSE when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            initSSE();
         });
         
         function updateUserCount() {
@@ -676,8 +693,6 @@
                         document.getElementById('walkContainer').innerHTML = '';
                         // Re-enable go button
                         document.getElementById('goButton').disabled = false;
-                        // Notify students that session is reset
-                        socket.emit('session_reset');
                     }
                 } catch (error) {
                     console.error('Error resetting session:', error);
@@ -793,6 +808,13 @@
             } catch (error) {
                 console.error('Error:', error);
                 alert('Error starting session');
+            }
+        });
+        
+        // Clean up SSE connection when page unloads
+        window.addEventListener('beforeunload', function() {
+            if (eventSource) {
+                eventSource.close();
             }
         });
     </script>

@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Privilege Walk - Student View</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -99,21 +98,10 @@
             padding: 1.5rem 1rem;
             border: none;
             border-radius: 15px;
-            font-size: 1.2rem;
+            font-size: 1.1rem;
             font-weight: 600;
             cursor: pointer;
-            transition: transform 0.2s ease, box-shadow 0.2s ease;
-            max-width: 200px;
-        }
-        
-        .answer-button:hover:not(:disabled) {
-            transform: translateY(-3px);
-            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
-        }
-        
-        .answer-button:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
+            transition: all 0.3s ease;
         }
         
         .agree-button {
@@ -121,31 +109,63 @@
             color: white;
         }
         
+        .agree-button:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(40, 167, 69, 0.3);
+        }
+        
         .disagree-button {
             background: linear-gradient(135deg, #dc3545 0%, #fd7e14 100%);
             color: white;
         }
         
+        .disagree-button:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(220, 53, 69, 0.3);
+        }
+        
+        .answer-button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        
         .progress-bar {
-            background: #f8f9fa;
-            border-radius: 10px;
+            width: 100%;
             height: 8px;
-            margin: 2rem 0;
+            background: #e9ecef;
+            border-radius: 4px;
+            margin: 1rem 0;
             overflow: hidden;
         }
         
         .progress-fill {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             height: 100%;
-            transition: width 0.5s ease;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             width: 0%;
+            transition: width 0.5s ease;
         }
         
         .progress-text {
-            text-align: center;
-            color: #666;
+            color: #667eea;
             font-size: 0.9rem;
-            margin-bottom: 1rem;
+            font-weight: 600;
+        }
+        
+        .position-indicator {
+            background: #f8f9fa;
+            padding: 1rem;
+            border-radius: 10px;
+            margin: 1rem 0;
+            text-align: center;
+            border-left: 4px solid #667eea;
+        }
+        
+        .position-value {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: #667eea;
         }
         
         .thank-you-screen {
@@ -155,6 +175,7 @@
             border-radius: 20px;
             box-shadow: 0 20px 40px rgba(0,0,0,0.1);
             text-align: center;
+            margin-bottom: 2rem;
         }
         
         .thank-you-icon {
@@ -171,41 +192,6 @@
         .thank-you-subtext {
             color: #666;
             line-height: 1.6;
-        }
-        
-        .loading {
-            text-align: center;
-            margin: 2rem 0;
-        }
-        
-        .spinner {
-            border: 3px solid #f3f3f3;
-            border-top: 3px solid #667eea;
-            border-radius: 50%;
-            width: 30px;
-            height: 30px;
-            animation: spin 1s linear infinite;
-            margin: 0 auto 1rem;
-        }
-        
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        
-        .position-indicator {
-            background: #f8f9fa;
-            padding: 1rem;
-            border-radius: 10px;
-            margin: 1rem 0;
-            text-align: center;
-            border-left: 4px solid #667eea;
-        }
-        
-        .position-value {
-            font-size: 1.2rem;
-            font-weight: 600;
-            color: #667eea;
         }
     </style>
 </head>
@@ -241,10 +227,10 @@
             </div>
             
             <div class="answer-buttons">
-                <button class="answer-button agree-button" id="agreeButton" onclick="submitAnswer(true)">
+                <button class="answer-button agree-button" id="agreeButton" onclick="submitAnswer('agree')">
                     👍 Agree
                 </button>
-                <button class="answer-button disagree-button" id="disagreeButton" onclick="submitAnswer(false)">
+                <button class="answer-button disagree-button" id="disagreeButton" onclick="submitAnswer('disagree')">
                     👎 Disagree
                 </button>
             </div>
@@ -269,42 +255,79 @@
     <script>
         const sessionId = '{{ session_id }}';
         const username = '{{ username }}';
-        const socket = io();
         
         let currentQuestion = 0;
         let totalQuestions = 12; // Total number of privilege walk questions
         let userPosition = 0;
         let hasAnswered = false;
+        let eventSource = null;
         
-        // Join student room
-        socket.emit('join_student', { session_id: sessionId });
-        
-        // Listen for session start
-        socket.on('session_started', function(data) {
-            currentQuestion = 0;
-            showQuestionScreen();
-            updateQuestionDisplay(data.question, data.question_number, data.total_questions);
-        });
-        
-        // Listen for next question
-        socket.on('next_question', function(data) {
-            currentQuestion = data.question_number - 1;
-            hasAnswered = false;
-            updateQuestionDisplay(data.question, data.question_number, data.total_questions);
-            enableAnswerButtons();
-        });
-        
-        // Listen for position updates
-        socket.on('position_update', function(data) {
-            if (data.positions[username] !== undefined) {
-                userPosition = data.positions[username];
-                updatePositionDisplay();
+        // Initialize SSE connection
+        function initSSE() {
+            if (eventSource) {
+                eventSource.close();
             }
-        });
+            
+            eventSource = new EventSource(`/stream/${sessionId}`);
+            
+            eventSource.onmessage = function(event) {
+                try {
+                    const data = JSON.parse(event.data);
+                    handleSSEEvent(data);
+                } catch (error) {
+                    console.error('Error parsing SSE data:', error);
+                }
+            };
+            
+            eventSource.onerror = function(error) {
+                console.error('SSE connection error:', error);
+                // Reconnect after 5 seconds
+                setTimeout(initSSE, 5000);
+            };
+        }
         
-        // Listen for session finished
-        socket.on('session_finished', function(data) {
-            showThankYouScreen();
+        // Handle SSE events
+        function handleSSEEvent(data) {
+            console.log('SSE Event received:', data);
+            
+            switch(data.type) {
+                case 'session_started':
+                    currentQuestion = 0;
+                    showQuestionScreen();
+                    updateQuestionDisplay(data.data.question, data.data.question_number, data.data.total_questions);
+                    break;
+                    
+                case 'next_question':
+                    currentQuestion = data.data.question_number - 1;
+                    hasAnswered = false;
+                    updateQuestionDisplay(data.data.question, data.data.question_number, data.data.total_questions);
+                    enableAnswerButtons();
+                    break;
+                    
+                case 'position_update':
+                    if (data.data.positions[username] !== undefined) {
+                        userPosition = data.data.positions[username];
+                        updatePositionDisplay();
+                    }
+                    break;
+                    
+                case 'session_finished':
+                    showThankYouScreen();
+                    break;
+                    
+                case 'connected':
+                    console.log('SSE connection established');
+                    break;
+                    
+                case 'heartbeat':
+                    // Keep connection alive
+                    break;
+            }
+        }
+        
+        // Initialize SSE when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            initSSE();
         });
         
         function showQuestionScreen() {
@@ -379,6 +402,13 @@
         
         // Initialize position display
         updatePositionDisplay();
+        
+        // Clean up SSE connection when page unloads
+        window.addEventListener('beforeunload', function() {
+            if (eventSource) {
+                eventSource.close();
+            }
+        });
     </script>
 </body>
 </html> 
