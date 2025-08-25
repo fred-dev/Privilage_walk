@@ -6,31 +6,15 @@ from datetime import datetime
 import os
 import qrcode
 from io import BytesIO
-import socket
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your-secret-key-here'
 socketio = SocketIO(app, cors_allowed_origins="*")
 
-# Load configuration
-def load_config():
-    try:
-        with open('config.json', 'r') as f:
-            return json.load(f)
-    except FileNotFoundError:
-        # Default config if file doesn't exist
-        return {
-            "server": {"host": "0.0.0.0", "port": 5001, "debug": True},
-            "network": {"local_testing": True, "local_ip": "localhost", "server_domain": "localhost"},
-            "questions_file": "questions.json"
-        }
-
-config = load_config()
-
 # Load questions from JSON file
 def load_questions():
     try:
-        with open(config['questions_file'], 'r') as f:
+        with open('questions.json', 'r') as f:
             questions_data = json.load(f)
             return [q['text'] for q in questions_data['questions']]
     except FileNotFoundError:
@@ -50,62 +34,20 @@ def load_questions():
             "I have always had secure housing and have never been at risk of homelessness."
         ]
 
-# Store active sessions
+# Store active sessions in memory (simple)
 active_sessions = {}
-
-def save_sessions():
-    """Save sessions to disk"""
-    try:
-        with open('sessions.json', 'w') as f:
-            # Convert datetime objects to strings for JSON serialization
-            sessions_to_save = {}
-            for session_id, session_data in active_sessions.items():
-                sessions_to_save[session_id] = session_data.copy()
-                if 'created_at' in sessions_to_save[session_id]:
-                    sessions_to_save[session_id]['created_at'] = sessions_to_save[session_id]['created_at'].isoformat()
-                for username, user_data in sessions_to_save[session_id].get('users', {}).items():
-                    if 'joined_at' in user_data:
-                        user_data['joined_at'] = user_data['joined_at'].isoformat()
-            json.dump(sessions_to_save, f, indent=2)
-    except Exception as e:
-        print(f"Error saving sessions: {e}")
-
-def load_sessions():
-    """Load sessions from disk"""
-    try:
-        with open('sessions.json', 'r') as f:
-            sessions_data = json.load(f)
-            for session_id, session_data in sessions_data.items():
-                # Convert string dates back to datetime objects
-                if 'created_at' in session_data:
-                    session_data['created_at'] = datetime.fromisoformat(session_data['created_at'])
-                for username, user_data in session_data.get('users', {}).items():
-                    if 'joined_at' in user_data:
-                        user_data['joined_at'] = datetime.fromisoformat(user_data['joined_at'])
-            return sessions_data
-    except FileNotFoundError:
-        return {}
-    except Exception as e:
-        print(f"Error loading sessions: {e}")
-        return {}
-
-# Load existing sessions on startup
-active_sessions = load_sessions()
-
-def get_network_ip():
-    """Get the local network IP address"""
-    try:
-        import socket
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.connect(("8.8.8.8", 80))
-        ip = s.getsockname()[0]
-        s.close()
-        return ip
-    except:
-        return None
 
 # Load questions
 QUESTIONS = load_questions()
+
+@app.route('/')
+def index():
+    """Main page to create a new session"""
+    # Add a simple health check response for Render
+    user_agent = request.headers.get('User-Agent', '')
+    if 'Render' in user_agent:
+        return jsonify({'status': 'healthy', 'message': 'Privilege Walk app is running'})
+    return render_template('index.html')
 
 @app.route('/health')
 def health_check():
@@ -126,77 +68,47 @@ def health_check():
             'timestamp': datetime.now().isoformat()
         }), 500
 
-@app.route('/')
-def index():
-    """Main page to create a new session"""
-    # Add a simple health check response for Render
-    user_agent = request.headers.get('User-Agent', '')
-    if 'Render' in user_agent:
-        return jsonify({'status': 'healthy', 'message': 'Privilege Walk app is running'})
-    return render_template('index.html')
-
 @app.route('/create_session', methods=['POST'])
 def create_session():
     """Create a new session"""
-    session_name = request.form.get('session_name', 'Unnamed Session')
+    session_name = request.form.get('session_name', 'Privilege Walk')
     session_id = str(uuid.uuid4())[:8]
     
     active_sessions[session_id] = {
         'name': session_name,
         'users': {},
-        'status': 'waiting',  # waiting, active, finished
+        'status': 'waiting',
         'current_question': 0,
-        'user_answers': {},
         'created_at': datetime.now()
     }
-    
-    # Save sessions to disk
-    save_sessions()
     
     return jsonify({'session_id': session_id, 'redirect_url': f'/instructor/{session_id}'})
 
 @app.route('/instructor/<session_id>')
 def instructor_view(session_id):
-    """Instructor view with QR code and controls"""
+    """Instructor view for managing a session"""
     if session_id not in active_sessions:
         return "Session not found", 404
     
     session_data = active_sessions[session_id]
     
-    # Get the IP address for the QR code based on config
-    if config['network']['local_testing']:
-        # Use configured local IP for testing
-        host_ip = config['network']['local_ip']
-        qr_url = f"http://{host_ip}:{config['server']['port']}/join/{session_id}"
-    else:
-        # Use server domain for production
-        host_ip = config['network']['server_domain']
-        qr_url = f"https://{host_ip}/join/{session_id}"
-    
-    # Get network IP for display
-    network_ip = get_network_ip()
+    # Simple QR code URL for Render
+    qr_url = f"https://privilage-walk.onrender.com/join/{session_id}"
     
     return render_template('instructor.html', 
-                         session_id=session_id, 
-                         session_name=session_data['name'],
-                         qr_url=qr_url,
-                         network_ip=network_ip)
+                          session_id=session_id, 
+                          session_name=session_data['name'],
+                          qr_url=qr_url,
+                          network_ip="Render")
 
 @app.route('/qr/<session_id>')
 def generate_qr_code(session_id):
-    """Generate QR code for a session"""
+    """Generate QR code for session joining"""
     if session_id not in active_sessions:
         return "Session not found", 404
     
-    # Get the IP address for the QR code based on config
-    if config['network']['local_testing']:
-        # Use configured local IP for testing
-        host_ip = config['network']['local_ip']
-        qr_url = f"http://{host_ip}:{config['server']['port']}/join/{session_id}"
-    else:
-        # Use server domain for production
-        host_ip = config['network']['server_domain']
-        qr_url = f"https://{host_ip}/join/{session_id}"
+    # Simple QR code URL for Render
+    qr_url = f"https://privilage-walk.onrender.com/join/{session_id}"
     
     # Generate QR code
     qr = qrcode.QRCode(
@@ -219,58 +131,34 @@ def generate_qr_code(session_id):
     return send_file(img_io, mimetype='image/png')
 
 @app.route('/join/<session_id>')
-def join_session(session_id):
-    """Student join page"""
+def join_session_page(session_id):
+    """Page for students to join a session"""
     if session_id not in active_sessions:
         return "Session not found", 404
     
     return render_template('student_join.html', session_id=session_id)
 
-@app.route('/student/<session_id>')
-def student_view(session_id):
-    """Student question answering interface"""
-    if session_id not in active_sessions:
-        return "Session not found", 404
-    
-    username = request.args.get('username')
-    if not username:
-        return "Username required", 400
-    
-    session_data = active_sessions[session_id]
-    if username not in session_data['users']:
-        return "User not found in session", 400
-    
-    return render_template('student.html', 
-                         session_id=session_id, 
-                         username=username,
-                         questions=QUESTIONS)
-
 @app.route('/api/join_session', methods=['POST'])
 def api_join_session():
     """API endpoint for students to join a session"""
-    data = request.get_json()
-    session_id = data.get('session_id')
-    username = data.get('username')
+    session_id = request.form.get('session_id')
+    username = request.form.get('username')
+    
+    if not session_id or not username:
+        return jsonify({'success': False, 'error': 'Missing session_id or username'}), 400
     
     if session_id not in active_sessions:
-        return jsonify({'error': 'Session not found'}), 404
+        return jsonify({'success': False, 'error': 'Session not found'}), 404
     
-    if not username or username.strip() == '':
-        return jsonify({'error': 'Username is required'}), 400
-    
-    # Check if username is already taken in this session
-    if username in active_sessions[session_id]['users']:
-        return jsonify({'error': 'Username already taken'}), 400
+    if active_sessions[session_id]['status'] != 'waiting':
+        return jsonify({'success': False, 'error': 'Session already started'}), 400
     
     # Add user to session
     active_sessions[session_id]['users'][username] = {
-        'joined_at': datetime.now(),
-        'position': 0,  # Starting position
-        'answers': []
+        'position': 0,
+        'current_question': 0,
+        'joined_at': datetime.now()
     }
-    
-    # Save sessions to disk
-    save_sessions()
     
     # Notify instructor view
     socketio.emit('user_joined', {
@@ -280,36 +168,44 @@ def api_join_session():
     
     return jsonify({'success': True, 'redirect_url': f'/student/{session_id}?username={username}'})
 
-@app.route('/api/start_session', methods=['POST'])
-def api_start_session():
-    """Start the privilege walk questions"""
-    data = request.get_json()
-    session_id = data.get('session_id')
+@app.route('/student/<session_id>')
+def student_view(session_id):
+    """Student view for answering questions"""
+    username = request.args.get('username')
     
-    print(f"🚀 START SESSION REQUEST: {session_id}")
+    if not username:
+        return "Username required", 400
     
     if session_id not in active_sessions:
-        print(f"❌ Session {session_id} not found")
-        return jsonify({'error': 'Session not found'}), 404
+        return "Session not found", 404
+    
+    if username not in active_sessions[session_id]['users']:
+        return "User not in session", 400
+    
+    return render_template('student.html', 
+                          session_id=session_id, 
+                          username=username,
+                          questions=QUESTIONS)
+
+@app.route('/api/start_session', methods=['POST'])
+def api_start_session():
+    """Start the privilege walk session"""
+    session_id = request.form.get('session_id')
+    
+    if not session_id or session_id not in active_sessions:
+        return jsonify({'success': False, 'error': 'Invalid session'}), 400
     
     session_data = active_sessions[session_id]
-    print(f"📊 Session data: {session_data}")
     
     if len(session_data['users']) == 0:
-        print(f"❌ No users in session {session_id}")
-        return jsonify({'error': 'No users in session'}), 400
+        return jsonify({'success': False, 'error': 'No users in session'}), 400
     
     session_data['status'] = 'active'
     session_data['current_question'] = 0
-    session_data['user_answers'] = {username: [] for username in session_data['users']}
-    
-    # Save sessions to disk
-    save_sessions()
     
     print(f"✅ Session {session_id} started with {len(session_data['users'])} users")
     
-    # Notify all students
-    print(f"📤 Emitting session_started to session_{session_id}")
+    # Notify all clients
     socketio.emit('session_started', {
         'question': QUESTIONS[0],
         'question_number': 1,
@@ -317,77 +213,51 @@ def api_start_session():
     }, room=f'session_{session_id}')
     
     # Also notify the instructor
-    print(f"📤 Emitting session_started to instructor_{session_id}")
     socketio.emit('session_started', {
         'question': QUESTIONS[0],
         'question_number': 1,
         'total_questions': len(QUESTIONS)
     }, room=f'instructor_{session_id}')
     
-    print(f"✅ Session start complete for {session_id}")
-    return jsonify({'success': True})
-
-@app.route('/api/reset_session', methods=['POST'])
-def api_reset_session():
-    """Reset a session for new questions"""
-    data = request.get_json()
-    session_id = data.get('session_id')
-    
-    if session_id not in active_sessions:
-        return jsonify({'error': 'Session not found'}), 404
-    
-    session_data = active_sessions[session_id]
-    
-    # Reset session state but keep users
-    session_data['status'] = 'waiting'
-    session_data['current_question'] = 0
-    session_data['user_answers'] = {}
-    
-    # Reset user positions
-    for username in session_data['users']:
-        session_data['users'][username]['position'] = 0
-        session_data['users'][username]['answers'] = []
-    
-    # Save sessions to disk
-    save_sessions()
-    
     return jsonify({'success': True})
 
 @app.route('/api/submit_answer', methods=['POST'])
 def api_submit_answer():
     """Submit a student's answer to a question"""
-    data = request.get_json()
-    session_id = data.get('session_id')
-    username = data.get('username')
-    answer = data.get('answer')  # True for agree, False for disagree
+    session_id = request.form.get('session_id')
+    username = request.form.get('username')
+    answer = request.form.get('answer')  # 'agree' or 'disagree'
+    
+    if not all([session_id, username, answer]):
+        return jsonify({'success': False, 'error': 'Missing parameters'}), 400
     
     if session_id not in active_sessions:
-        return jsonify({'error': 'Session not found'}), 404
+        return jsonify({'success': False, 'error': 'Session not found'}), 404
     
     session_data = active_sessions[session_id]
+    
     if username not in session_data['users']:
-        return jsonify({'error': 'User not found'}), 400
+        return jsonify({'success': False, 'error': 'User not in session'}), 400
     
     if session_data['status'] != 'active':
-        return jsonify({'error': 'Session not active'}), 400
+        return jsonify({'success': False, 'error': 'Session not active'}), 400
     
+    user_data = session_data['users'][username]
     current_q = session_data['current_question']
     
-    # Store answer
-    if username not in session_data['user_answers']:
-        session_data['user_answers'][username] = []
+    if user_data['current_question'] != current_q:
+        return jsonify({'success': False, 'error': 'Question already answered'}), 400
     
-    session_data['user_answers'][username].append(answer)
+    # Update user's position based on answer
+    if answer == 'agree':
+        user_data['position'] += 1
+    elif answer == 'disagree':
+        user_data['position'] -= 1
     
-    # Calculate new position
-    move_amount = 100 / len(QUESTIONS)  # Total screen height divided by number of questions
-    if answer:  # Agree - move up
-        session_data['users'][username]['position'] += move_amount
-    else:  # Disagree - move down
-        session_data['users'][username]['position'] -= move_amount
+    user_data['current_question'] = current_q + 1
     
-    # Check if all users have answered
-    all_answered = all(len(answers) > current_q for answers in session_data['user_answers'].values())
+    # Check if all users have answered this question
+    all_answered = all(user['current_question'] > current_q for user in session_data['users'].values())
     
     if all_answered:
         # Move to next question
@@ -408,63 +278,72 @@ def api_submit_answer():
             }, room=f'instructor_{session_id}')
         else:
             # Next question
+            next_q = session_data['current_question']
             socketio.emit('next_question', {
-                'question': QUESTIONS[session_data['current_question']],
-                'question_number': session_data['current_question'] + 1,
+                'question': QUESTIONS[next_q],
+                'question_number': next_q + 1,
                 'total_questions': len(QUESTIONS)
             }, room=f'session_{session_id}')
             
             # Also notify the instructor
             socketio.emit('next_question', {
-                'question': QUESTIONS[session_data['current_question']],
-                'question_number': session_data['current_question'] + 1,
+                'question': QUESTIONS[next_q],
+                'question_number': next_q + 1,
                 'total_questions': len(QUESTIONS)
             }, room=f'instructor_{session_id}')
     
     # Update positions for all clients
-    socketio.emit('position_update', {
-        'positions': {username: user_data['position'] 
-                     for username, user_data in session_data['users'].items()}
-    }, room=f'session_{session_id}')
-    
-    # Also update the instructor
-    socketio.emit('position_update', {
-        'positions': {username: user_data['position'] 
-                     for username, user_data in session_data['users'].items()}
-    }, room=f'instructor_{session_id}')
-    
-    # Save sessions to disk
-    save_sessions()
+    positions = {username: user_data['position'] for username, user_data in session_data['users'].items()}
+    socketio.emit('position_update', {'positions': positions}, room=f'session_{session_id}')
+    socketio.emit('position_update', {'positions': positions}, room=f'instructor_{session_id}')
     
     return jsonify({'success': True, 'all_answered': all_answered})
+
+@app.route('/api/reset_session', methods=['POST'])
+def api_reset_session():
+    """Reset a session to allow new students to join"""
+    session_id = request.form.get('session_id')
+    
+    if not session_id or session_id not in active_sessions:
+        return jsonify({'success': False, 'error': 'Invalid session'}), 400
+    
+    # Reset session
+    active_sessions[session_id]['status'] = 'waiting'
+    active_sessions[session_id]['current_question'] = 0
+    active_sessions[session_id]['users'] = {}
+    
+    # Notify all clients
+    socketio.emit('session_reset', {}, room=f'session_{session_id}')
+    socketio.emit('session_reset', {}, room=f'instructor_{session_id}')
+    
+    return jsonify({'success': True})
 
 # WebSocket events
 @socketio.on('join_instructor')
 def on_join_instructor(data):
-    session_id = data['session_id']
-    join_room(f'instructor_{session_id}')
+    """Instructor joins the instructor room"""
+    session_id = data.get('session_id')
+    if session_id:
+        join_room(f'instructor_{session_id}')
+        print(f"👨‍🏫 Instructor joined session {session_id}")
 
 @socketio.on('join_student')
 def on_join_student(data):
-    session_id = data['session_id']
-    join_room(f'session_{session_id}')
+    """Student joins the student room"""
+    session_id = data.get('session_id')
+    if session_id:
+        join_room(f'session_{session_id}')
+        print(f"👤 Student joined session {session_id}")
 
 @socketio.on('disconnect')
 def on_disconnect():
-    # Handle disconnection if needed
-    pass
-
-@socketio.on('session_reset')
-def on_session_reset(data):
-    # Notify all students in the session that it has been reset
-    session_id = data.get('session_id')
-    if session_id and session_id in active_sessions:
-        socketio.emit('session_reset', room=f'session_{session_id}')
+    """Handle client disconnect"""
+    print("Client disconnected")
 
 if __name__ == '__main__':
-    # Use PORT environment variable for Render, fallback to config
-    port = int(os.environ.get('PORT', config['server']['port']))
+    # Simple port binding for Render
+    port = int(os.environ.get('PORT', 5001))
     socketio.run(app, 
-                debug=config['server']['debug'], 
-                host=config['server']['host'], 
+                debug=False, 
+                host='0.0.0.0', 
                 port=port) 
