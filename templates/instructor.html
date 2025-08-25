@@ -410,9 +410,9 @@
                         <button onclick="refreshQRCode()" class="refresh-btn">🔄 Refresh QR Code</button>
                     </div>
                 </div>
-                <div class="join-url">{{ qr_url }}</div>
+                <div class="join-url">http://127.0.0.1:5001/join/{{ session_id }}</div>
                 <div class="debug-info">
-                    <small>Debug: QR code points to: <code>{{ qr_url }}</code></small>
+                    <small>Debug: QR code points to: <code>http://127.0.0.1:5001/join/{{ session_id }}</code></small>
                     <br><small>💡 The QR code automatically uses your network IP address so students can connect!</small>
                 </div>
             </div>
@@ -611,15 +611,48 @@
         }
 
         function showMainView() {
-            document.getElementById('mainView').style.display = 'block';
+            document.querySelector('.main-content').style.display = 'flex';
             document.getElementById('privilegeWalkView').style.display = 'none';
             document.getElementById('finalResults').style.display = 'none';
         }
 
         function showPrivilegeWalkView() {
-            document.getElementById('mainView').style.display = 'none';
+            document.querySelector('.main-content').style.display = 'none';
             document.getElementById('privilegeWalkView').style.display = 'block';
             document.getElementById('finalResults').style.display = 'none';
+        }
+
+        async function resetSession() {
+            // Reset the current session for new questions
+            if (confirm('Reset this session? Students will keep their usernames but start fresh questions.')) {
+                try {
+                    const response = await fetch('/api/reset_session', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ session_id: sessionId })
+                    });
+                    
+                    const data = await response.json();
+                    if (data.success) {
+                        // Hide final results
+                        document.getElementById('finalResults').style.display = 'none';
+                        // Show privilege walk view again
+                        showPrivilegeWalkView();
+                        // Reset session state
+                        sessionStatus = 'waiting';
+                        updateStatus();
+                        // Clear previous results
+                        document.getElementById('walkContainer').innerHTML = '';
+                        // Re-enable go button
+                        document.getElementById('goButton').disabled = false;
+                    }
+                } catch (error) {
+                    console.error('Error resetting session:', error);
+                    alert('Error resetting session');
+                }
+            }
         }
 
         function showFinalResults(finalPositions) {

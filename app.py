@@ -61,7 +61,19 @@ def instructor_view(session_id):
         return "Session not found", 404
     
     log_session_state(session_id, "INSTRUCTOR_VIEW_ACCESSED")
-    return render_template('instructor.html', session_id=session_id)
+    
+    # Get local IP for testing
+    import socket
+    try:
+        hostname = socket.gethostname()
+        local_ip = socket.gethostbyname(hostname)
+    except:
+        local_ip = "127.0.0.1"
+    
+    return render_template('instructor.html', 
+                         session_id=session_id,
+                         session_name="Privilege Walk Session",
+                         network_ip=local_ip)
 
 @app.route('/join/<session_id>')
 def student_join(session_id):
