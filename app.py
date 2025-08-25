@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 app.secret_key = 'your-secret-key-here'
 
-# In-memory storage for active sessions
+# In-memory storage for active sessions (will be lost on worker restart, but that's OK)
 active_sessions = {}
 
 def log_session_state(session_id, action, details=""):
@@ -26,21 +26,6 @@ def log_session_state(session_id, action, details=""):
     session_info = active_sessions.get(session_id, {})
     user_count = len(session_info.get('users', {}))
     logger.info(f"SESSION {action}: {session_id} | Users: {user_count} | {details}")
-
-def notify_sse_clients(session_id, event_type, data):
-    """Notify all SSE clients in a session about an event"""
-    if session_id in active_sessions:
-        # Add event to pending events
-        if 'pending_events' not in active_sessions[session_id]:
-            active_sessions[session_id]['pending_events'] = []
-
-        active_sessions[session_id]['pending_events'].append({
-            'type': event_type,
-            'data': data,
-            'timestamp': datetime.now().isoformat()
-        })
-        
-        logger.info(f"SSE Event queued: {session_id} | {event_type} | {data}")
 
 @app.route('/')
 def index():
@@ -63,7 +48,7 @@ def create_session():
         'status': 'waiting',
         'current_question': 0,
         'questions': load_questions(),
-        'pending_events': []
+        'last_activity': datetime.now().isoformat()
     }
     
     log_session_state(session_id, "CREATED")
@@ -106,9 +91,6 @@ def student_view(session_id):
         }
         
         log_session_state(session_id, "STUDENT_JOINED", f"Username: {username}")
-        
-        # Notify instructor about new user
-        notify_sse_clients(session_id, 'user_joined', {'username': username})
     
     return render_template('student.html', session_id=session_id, username=username)
 
@@ -155,9 +137,6 @@ def api_join_session():
     
     log_session_state(session_id, "API_JOIN", f"Username: {username}")
     
-    # Notify all clients about new user
-    notify_sse_clients(session_id, 'user_joined', {'username': username})
-    
     return jsonify({'success': True, 'session_id': session_id})
 
 @app.route('/api/start_session', methods=['POST'])
@@ -172,19 +151,9 @@ def api_start_session():
     session_data = active_sessions[session_id]
     session_data['status'] = 'active'
     session_data['current_question'] = 0
+    session_data['last_activity'] = datetime.now().isoformat()
     
     log_session_state(session_id, "STARTED")
-    
-    # Get first question
-    questions = session_data['questions']
-    first_question = questions[0] if questions else "No questions available"
-    
-    # Notify all clients that session has started
-    notify_sse_clients(session_id, 'session_started', {
-        'question': first_question,
-        'question_number': 1,
-        'total_questions': len(questions)
-    })
     
     return jsonify({'success': True})
 
@@ -230,13 +199,9 @@ def api_submit_answer():
         questions = session_data['questions']
         
         if session_data['current_question'] < len(questions):
-            # Next question
+            # Next question - just log it
             next_question = questions[session_data['current_question']]
-            notify_sse_clients(session_id, 'next_question', {
-                'question': next_question,
-                'question_number': session_data['current_question'] + 1,
-                'total_questions': len(questions)
-            })
+            logger.info(f"Moving to next question: {session_id} | Q{session_data['current_question'] + 1}: {next_question}")
             
             # Reset answers for next question
             for user in session_data['users'].values():
@@ -246,16 +211,9 @@ def api_submit_answer():
             session_data['status'] = 'finished'
             final_positions = {username: user['position'] for username, user in session_data['users'].items()}
             
-            notify_sse_clients(session_id, 'session_finished', {
-                'final_positions': final_positions
-            })
-            
             log_session_state(session_id, "FINISHED", f"Final positions: {final_positions}")
     
-    # Send position update
-    positions = {username: user['position'] for username, user in session_data['users'].items()}
-    notify_sse_clients(session_id, 'position_update', {'positions': positions})
-    
+    session_data['last_activity'] = datetime.now().isoformat()
     return jsonify({'success': True})
 
 @app.route('/api/reset_session', methods=['POST'])
@@ -277,63 +235,63 @@ def api_reset_session():
         user['answers'] = []
         user['position'] = 0
     
-    # Clear pending events
-    session_data['pending_events'] = []
+    session_data['last_activity'] = datetime.now().isoformat()
     
     log_session_state(session_id, "RESET")
     
-    # Notify all clients about reset
-    notify_sse_clients(session_id, 'session_reset', {})
-    
     return jsonify({'success': True})
 
-@app.route('/stream/<session_id>')
-def stream(session_id):
-    """SSE stream endpoint for real-time updates"""
+# Polling endpoints for real-time updates
+@app.route('/api/session_status/<session_id>')
+def session_status(session_id):
+    """Get current session status for polling"""
     if session_id not in active_sessions:
-        logger.error(f"SSE stream attempt for non-existent session: {session_id}")
-        return "Session not found", 404
+        return jsonify({'error': 'Session not found'}), 404
+    
+    session_data = active_sessions[session_id]
+    
+    return jsonify({
+        'status': session_data['status'],
+        'users': list(session_data['users'].keys()),
+        'user_count': len(session_data['users']),
+        'current_question': session_data['current_question'],
+        'total_questions': len(session_data['questions']),
+        'last_activity': session_data['last_activity']
+    })
 
-    logger.info(f"SSE stream started for session: {session_id}")
+@app.route('/api/question/<session_id>')
+def get_question(session_id):
+    """Get current question for a session"""
+    if session_id not in active_sessions:
+        return jsonify({'error': 'Session not found'}), 404
+    
+    session_data = active_sessions[session_id]
+    
+    if session_data['status'] != 'active':
+        return jsonify({'error': 'Session not active'}), 400
+    
+    current_q = session_data['current_question']
+    questions = session_data['questions']
+    
+    if current_q >= len(questions):
+        return jsonify({'error': 'No more questions'}), 400
+    
+    return jsonify({
+        'question': questions[current_q],
+        'question_number': current_q + 1,
+        'total_questions': len(questions)
+    })
 
-    def generate():
-        try:
-            # Send initial connection message
-            yield f"data: {json.dumps({'type': 'connected', 'session_id': session_id})}\n\n"
-            logger.info(f"SSE connection established for session: {session_id}")
-
-            # Keep track of last event sent
-            last_event_index = 0
-
-            # Keep connection alive and check for new events
-            while True:
-                try:
-                    # Check for new events
-                    if 'pending_events' in active_sessions[session_id]:
-                        events = active_sessions[session_id]['pending_events']
-                        while last_event_index < len(events):
-                            event = events[last_event_index]
-                            yield f"data: {json.dumps(event)}\n\n"
-                            last_event_index += 1
-                            logger.debug(f"SSE event sent: {session_id} | {event['type']}")
-
-                    # Send keepalive every 15 seconds
-                    yield f"data: {json.dumps({'type': 'keepalive', 'timestamp': datetime.now().isoformat()})}\n\n"
-                    
-                    # Simple sleep - Render will handle worker configuration
-                    time.sleep(15)
-
-                except GeneratorExit:
-                    logger.info(f"SSE stream closed by client for session: {session_id}")
-                    break
-                except Exception as e:
-                    logger.error(f"SSE stream error for session {session_id}: {str(e)}")
-                    break
-
-        except Exception as e:
-            logger.error(f"SSE stream generation error for session {session_id}: {str(e)}")
-
-    return Response(generate(), mimetype='text/event-stream')
+@app.route('/api/positions/<session_id>')
+def get_positions(session_id):
+    """Get current user positions for a session"""
+    if session_id not in active_sessions:
+        return jsonify({'error': 'Session not found'}), 404
+    
+    session_data = active_sessions[session_id]
+    positions = {username: user['position'] for username, user in session_data['users'].items()}
+    
+    return jsonify({'positions': positions})
 
 @app.route('/health')
 def health_check():
@@ -351,10 +309,23 @@ def load_questions():
         with open('questions.json', 'r') as f:
             questions = json.load(f)
             logger.info(f"Loaded {len(questions)} questions from questions.json")
-            return questions
+            return [q['text'] for q in questions['questions']]
     except Exception as e:
         logger.error(f"Error loading questions: {str(e)}")
-        return ["Sample question 1", "Sample question 2"]
+        return [
+            "I have rarely been judged negatively or discriminated against because of my body size.",
+            "My mental health is generally robust, and it has never seriously limited my opportunities.",
+            "I am neurotypical, and my ways of thinking and learning are usually supported in school or work.",
+            "My sexuality has never caused me to be excluded, harassed, or made invisible.",
+            "I am able-bodied, and I do not face barriers to everyday activities, buildings, or services.",
+            "I have access to post-secondary education and am likely to complete it.",
+            "My skin colour has never caused me to be unfairly treated or stereotyped.",
+            "I am a citizen or permanent resident and do not have to worry about losing my right to remain in this country.",
+            "My gender identity is cisgender and has never been a barrier to being accepted or respected.",
+            "English is my first or fluent language, and it has always been an advantage for me in education and society.",
+            "I grew up in a family that was financially secure and could afford most of what we needed.",
+            "I have always had secure housing and have never been at risk of homelessness."
+        ]
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5001))

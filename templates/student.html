@@ -260,117 +260,123 @@
         let totalQuestions = 12; // Total number of privilege walk questions
         let userPosition = 0;
         let hasAnswered = false;
-        let eventSource = null;
-        
-        // Initialize SSE connection
-        function initSSE() {
-            if (eventSource) {
-                eventSource.close();
+        let pollInterval = null;
+
+        function startPolling() {
+            // Poll every 2 seconds for updates
+            pollInterval = setInterval(async () => {
+                try {
+                    const response = await fetch(`/api/session_status/${sessionId}`);
+                    if (response.ok) {
+                        const data = await response.json();
+                        handleStatusUpdate(data);
+                    }
+                } catch (error) {
+                    console.error('Polling error:', error);
+                }
+            }, 2000);
+        }
+
+        function handleStatusUpdate(data) {
+            console.log('Status update received:', data);
+            
+            // Check if session has started
+            if (data.status === 'active' && currentQuestion === 0) {
+                currentQuestion = 0;
+                showQuestionScreen();
+                loadCurrentQuestion();
             }
             
-            eventSource = new EventSource(`/stream/${sessionId}`);
+            // Check if we need to move to next question
+            if (data.status === 'active' && data.current_question > currentQuestion) {
+                currentQuestion = data.current_question;
+                hasAnswered = false;
+                loadCurrentQuestion();
+                enableAnswerButtons();
+            }
             
-            eventSource.onmessage = function(event) {
-                try {
-                    const data = JSON.parse(event.data);
-                    handleSSEEvent(data);
-                } catch (error) {
-                    console.error('Error parsing SSE data:', error);
-                }
-            };
-            
-            eventSource.onerror = function(error) {
-                console.error('SSE connection error:', error);
-                // Reconnect after 5 seconds
-                setTimeout(initSSE, 5000);
-            };
+            // Check if session is finished
+            if (data.status === 'finished') {
+                showThankYouScreen();
+            }
         }
-        
-        // Handle SSE events
-        function handleSSEEvent(data) {
-            console.log('SSE Event received:', data);
-            
-            switch(data.type) {
-                case 'session_started':
-                    currentQuestion = 0;
-                    showQuestionScreen();
-                    updateQuestionDisplay(data.data.question, data.data.question_number, data.data.total_questions);
-                    break;
-                    
-                case 'next_question':
-                    currentQuestion = data.data.question_number - 1;
-                    hasAnswered = false;
-                    updateQuestionDisplay(data.data.question, data.data.question_number, data.data.total_questions);
-                    enableAnswerButtons();
-                    break;
-                    
-                case 'position_update':
-                    if (data.data.positions[username] !== undefined) {
-                        userPosition = data.data.positions[username];
+
+        async function loadCurrentQuestion() {
+            try {
+                const response = await fetch(`/api/question/${sessionId}`);
+                if (response.ok) {
+                    const data = await response.json();
+                    updateQuestionDisplay(data.question, data.question_number, data.total_questions);
+                }
+            } catch (error) {
+                console.error('Error loading question:', error);
+            }
+        }
+
+        async function loadPosition() {
+            try {
+                const response = await fetch(`/api/positions/${sessionId}`);
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.positions[username] !== undefined) {
+                        userPosition = data.positions[username];
                         updatePositionDisplay();
                     }
-                    break;
-                    
-                case 'session_finished':
-                    showThankYouScreen();
-                    break;
-                    
-                case 'connected':
-                    console.log('SSE connection established');
-                    break;
-                    
-                case 'keepalive':
-                    // Keep connection alive
-                    break;
+                }
+            } catch (error) {
+                console.error('Error loading position:', error);
             }
         }
-        
-        // Initialize SSE when page loads
-        document.addEventListener('DOMContentLoaded', function() {
-            initSSE();
-        });
-        
+
+        function updateQuestionDisplay(question, questionNumber, totalQuestions) {
+            const questionText = document.getElementById('questionText');
+            const questionProgress = document.getElementById('questionNumber');
+            
+            if (questionText) questionText.textContent = question;
+            if (questionProgress) questionProgress.textContent = `Question ${questionNumber} of ${totalQuestions}`;
+        }
+
+        function updatePositionDisplay() {
+            const positionElement = document.getElementById('positionValue');
+            if (positionElement) {
+                positionElement.textContent = `Your current position: ${userPosition}`;
+            }
+        }
+
         function showQuestionScreen() {
             document.getElementById('waitingScreen').style.display = 'none';
             document.getElementById('questionScreen').style.display = 'block';
             document.getElementById('thankYouScreen').style.display = 'none';
         }
-        
+
         function showThankYouScreen() {
             document.getElementById('waitingScreen').style.display = 'none';
             document.getElementById('questionScreen').style.display = 'none';
             document.getElementById('thankYouScreen').style.display = 'block';
         }
-        
-        function updateQuestionDisplay(question, questionNumber, totalQuestions) {
-            document.getElementById('questionText').textContent = question;
-            document.getElementById('questionNumber').textContent = `Question ${questionNumber} of ${totalQuestions}`;
-            
-            const progress = (questionNumber - 1) / totalQuestions * 100;
-            document.getElementById('progressFill').style.width = `${progress}%`;
-            document.getElementById('progressText').textContent = `${Math.round(progress)}% Complete`;
-        }
-        
-        function updatePositionDisplay() {
-            document.getElementById('positionValue').textContent = userPosition.toFixed(1);
-        }
-        
+
         function enableAnswerButtons() {
-            document.getElementById('agreeButton').disabled = false;
-            document.getElementById('disagreeButton').disabled = false;
+            const agreeBtn = document.getElementById('agreeButton');
+            const disagreeBtn = document.getElementById('disagreeButton');
+            
+            if (agreeBtn) agreeBtn.disabled = false;
+            if (disagreeBtn) disagreeBtn.disabled = false;
         }
-        
+
         function disableAnswerButtons() {
-            document.getElementById('agreeButton').disabled = true;
-            document.getElementById('disagreeButton').disabled = true;
+            const agreeBtn = document.getElementById('agreeButton');
+            const disagreeBtn = document.getElementById('disagreeButton');
+            
+            if (agreeBtn) agreeBtn.disabled = true;
+            if (disagreeBtn) disagreeBtn.disabled = true;
         }
-        
+
         async function submitAnswer(answer) {
-            if (hasAnswered) return;
-            
-            hasAnswered = true;
-            disableAnswerButtons();
-            
+            if (hasAnswered) {
+                alert('You have already answered this question.');
+                return;
+            }
+
             try {
                 const response = await fetch('/api/submit_answer', {
                     method: 'POST',
@@ -383,30 +389,39 @@
                         answer: answer
                     })
                 });
-                
+
                 const data = await response.json();
-                
-                if (!data.success) {
-                    console.error('Error submitting answer:', data.error);
-                    // Re-enable buttons on error
-                    hasAnswered = false;
-                    enableAnswerButtons();
+                if (data.success) {
+                    hasAnswered = true;
+                    disableAnswerButtons();
+                    
+                    // Update progress bar
+                    const progressBar = document.getElementById('progressFill');
+                    if (progressBar) {
+                        const progress = ((currentQuestion + 1) / totalQuestions) * 100;
+                        progressBar.style.width = progress + '%';
+                    }
+                    
+                    // Load updated position
+                    setTimeout(loadPosition, 1000);
+                } else {
+                    alert('Error submitting answer: ' + data.error);
                 }
             } catch (error) {
                 console.error('Error:', error);
-                // Re-enable buttons on error
-                hasAnswered = false;
-                enableAnswerButtons();
+                alert('Error submitting answer');
             }
         }
-        
-        // Initialize position display
-        updatePositionDisplay();
-        
-        // Clean up SSE connection when page unloads
+
+        // Start polling when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            startPolling();
+        });
+
+        // Clean up polling when page unloads
         window.addEventListener('beforeunload', function() {
-            if (eventSource) {
-                eventSource.close();
+            if (pollInterval) {
+                clearInterval(pollInterval);
             }
         });
     </script>

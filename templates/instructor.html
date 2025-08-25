@@ -497,268 +497,131 @@
         
         let users = {};
         let sessionStatus = 'waiting';
-        let eventSource = null;
-        
-        // Initialize SSE connection
-        function initSSE() {
-            if (eventSource) {
-                eventSource.close();
-            }
-            
-            eventSource = new EventSource(`/stream/${sessionId}`);
-            
-            eventSource.onmessage = function(event) {
+        let pollInterval = null;
+
+        function startPolling() {
+            // Poll every 2 seconds for updates
+            pollInterval = setInterval(async () => {
                 try {
-                    const data = JSON.parse(event.data);
-                    handleSSEEvent(data);
+                    const response = await fetch(`/api/session_status/${sessionId}`);
+                    if (response.ok) {
+                        const data = await response.json();
+                        handleStatusUpdate(data);
+                    }
                 } catch (error) {
-                    console.error('Error parsing SSE data:', error);
+                    console.error('Polling error:', error);
                 }
-            };
-            
-            eventSource.onerror = function(error) {
-                console.error('SSE connection error:', error);
-                // Reconnect after 5 seconds
-                setTimeout(initSSE, 5000);
-            };
+            }, 2000);
         }
-        
-        // Handle SSE events
-        function handleSSEEvent(data) {
-            console.log('SSE Event received:', data);
+
+        function handleStatusUpdate(data) {
+            console.log('Status update received:', data);
             
-            switch(data.type) {
-                case 'user_joined':
-                    users[data.data.username] = { joined_at: new Date() };
-                    updateUserCount();
-                    updateUserList();
-                    updateGoButton();
-                    break;
-                    
-                case 'session_started':
-                    console.log('🎯 SESSION STARTED EVENT RECEIVED!', data.data);
-                    sessionStatus = 'active';
-                    updateStatus();
-                    console.log('About to call showPrivilegeWalkView()...');
+            // Update user count and list
+            if (data.users) {
+                users = {};
+                data.users.forEach(username => {
+                    users[username] = { joined_at: new Date() };
+                });
+                updateUserCount();
+                updateUserList();
+                updateGoButton();
+            }
+            
+            // Update session status
+            if (data.status && data.status !== sessionStatus) {
+                sessionStatus = data.status;
+                updateStatus();
+                
+                if (sessionStatus === 'active') {
                     showPrivilegeWalkView();
-                    updateQuestionDisplay(data.data.question, data.data.question_number, data.data.total_questions);
+                    loadCurrentQuestion();
                     createUserMarkers();
-                    break;
-                    
-                case 'next_question':
-                    updateQuestionDisplay(data.data.question, data.data.question_number, data.data.total_questions);
-                    break;
-                    
-                case 'position_update':
-                    updateUserPositions(data.data.positions);
-                    break;
-                    
-                case 'session_finished':
-                    sessionStatus = 'finished';
-                    updateStatus();
-                    showFinalResults(data.data.final_positions);
-                    break;
-                    
-                case 'session_reset':
-                    // Handle session reset
-                    sessionStatus = 'waiting';
-                    updateStatus();
-                    showMainView();
-                    users = {};
-                    updateUserCount();
-                    updateUserList();
-                    updateGoButton();
-                    break;
-                    
-                case 'connected':
-                    console.log('SSE connection established');
-                    break;
-                    
-                case 'keepalive':
-                    // Keep connection alive
-                    break;
+                } else if (sessionStatus === 'finished') {
+                    loadFinalResults();
+                }
             }
         }
-        
-        // Initialize SSE when page loads
-        document.addEventListener('DOMContentLoaded', function() {
-            initSSE();
-        });
-        
+
+        async function loadCurrentQuestion() {
+            try {
+                const response = await fetch(`/api/question/${sessionId}`);
+                if (response.ok) {
+                    const data = await response.json();
+                    updateQuestionDisplay(data.question, data.question_number, data.total_questions);
+                }
+            } catch (error) {
+                console.error('Error loading question:', error);
+            }
+        }
+
+        async function loadFinalResults() {
+            try {
+                const response = await fetch(`/api/positions/${sessionId}`);
+                if (response.ok) {
+                    const data = await response.json();
+                    showFinalResults(data.positions);
+                }
+            } catch (error) {
+                console.error('Error loading final results:', error);
+            }
+        }
+
+        function updateStatus() {
+            const statusElement = document.getElementById('status');
+            if (statusElement) {
+                if (sessionStatus === 'waiting') {
+                    statusElement.textContent = 'Waiting for students to join...';
+                    statusElement.className = 'status waiting';
+                } else if (sessionStatus === 'active') {
+                    statusElement.textContent = 'Privilege Walk in progress...';
+                    statusElement.className = 'status active';
+                } else if (sessionStatus === 'finished') {
+                    statusElement.textContent = 'Session finished!';
+                    statusElement.className = 'status finished';
+                }
+            }
+        }
+
         function updateUserCount() {
-            document.getElementById('userCount').textContent = Object.keys(users).length;
-        }
-        
-        function updateUserList() {
-            const userList = document.getElementById('userList');
-            if (Object.keys(users).length === 0) {
-                userList.innerHTML = '<p style="text-align: center; color: #666;">No students joined yet</p>';
-                return;
+            const userCountElement = document.getElementById('userCount');
+            if (userCountElement) {
+                userCountElement.textContent = Object.keys(users).length;
             }
-            
-            userList.innerHTML = Object.keys(users).map(username => 
-                `<div class="user-item">👤 ${username}</div>`
-            ).join('');
         }
-        
+
+        function updateUserList() {
+            const userListElement = document.getElementById('userList');
+            if (userListElement) {
+                if (Object.keys(users).length === 0) {
+                    userListElement.innerHTML = '<p style="text-align: center; color: #666;">No students joined yet</p>';
+                } else {
+                    userListElement.innerHTML = Object.keys(users).map(username => 
+                        `<div class="user-item">👤 ${username}</div>`
+                    ).join('');
+                }
+            }
+        }
+
         function updateGoButton() {
             const goButton = document.getElementById('goButton');
-            goButton.disabled = Object.keys(users).length === 0;
-        }
-        
-        function updateStatus() {
-            const status = document.getElementById('status');
-            status.className = `status ${sessionStatus}`;
-            
-            switch(sessionStatus) {
-                case 'waiting':
-                    status.textContent = 'Waiting for students to join...';
-                    break;
-                case 'active':
-                    status.textContent = 'Privilege walk in progress...';
-                    break;
-                case 'finished':
-                    status.textContent = 'Session completed!';
-                    break;
+            if (goButton) {
+                goButton.disabled = Object.keys(users).length === 0;
             }
         }
-        
-        function showPrivilegeWalkView() {
-            console.log('=== SHOWING PRIVILEGE WALK VIEW ===');
-            
-            // Hide the main content (student join area)
-            const mainContent = document.querySelector('.main-content');
-            console.log('Main content element:', mainContent);
-            if (mainContent) {
-                mainContent.style.display = 'none';
-                console.log('✅ Main content hidden');
-            } else {
-                console.log('❌ Main content not found!');
-            }
-            
-            // Show the privilege walk view
-            const walkView = document.getElementById('privilegeWalkView');
-            console.log('Privilege walk view element:', walkView);
-            if (walkView) {
-                walkView.style.display = 'block';
-                console.log('✅ Privilege walk view shown');
-                
-                // Force a repaint
-                walkView.offsetHeight;
-                
-                // Add a visible indicator
-                walkView.style.border = '3px solid red';
-                console.log('Added red border to make it visible');
-            } else {
-                console.log('❌ Privilege walk view not found!');
-            }
-            
-            // Debug: check all elements
-            console.log('All elements found:');
-            console.log('- .main-content:', document.querySelector('.main-content'));
-            console.log('- #privilegeWalkView:', document.getElementById('privilegeWalkView'));
-            console.log('- #finalResults:', document.getElementById('finalResults'));
-        }
-        
+
         function showMainView() {
-            // Show the main content (student join area)
-            document.querySelector('.main-content').style.display = 'flex';
-            // Hide the privilege walk view and final results
+            document.getElementById('mainView').style.display = 'block';
             document.getElementById('privilegeWalkView').style.display = 'none';
             document.getElementById('finalResults').style.display = 'none';
         }
-        
-        async function resetSession() {
-            // Reset the current session for new questions
-            if (confirm('Reset this session? Students will keep their usernames but start fresh questions.')) {
-                try {
-                    const response = await fetch('/api/reset_session', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({ session_id: sessionId })
-                    });
-                    
-                    const data = await response.json();
-                    if (data.success) {
-                        // Hide final results
-                        document.getElementById('finalResults').style.display = 'none';
-                        // Show privilege walk view again
-                        showPrivilegeWalkView();
-                        // Reset session state
-                        sessionStatus = 'waiting';
-                        updateStatus();
-                        // Clear previous results
-                        document.getElementById('walkContainer').innerHTML = '';
-                        // Re-enable go button
-                        document.getElementById('goButton').disabled = false;
-                    }
-                } catch (error) {
-                    console.error('Error resetting session:', error);
-                    alert('Error resetting session');
-                }
-            }
+
+        function showPrivilegeWalkView() {
+            document.getElementById('mainView').style.display = 'none';
+            document.getElementById('privilegeWalkView').style.display = 'block';
+            document.getElementById('finalResults').style.display = 'none';
         }
-        
-        function createNewSession() {
-            // Create a completely new session
-            if (confirm('Create a new session? This will generate a new QR code and session ID.')) {
-                window.location.href = '/';
-            }
-        }
-        
-        function testViewTransition() {
-            console.log('=== TESTING VIEW TRANSITION ===');
-            console.log('Current session status:', sessionStatus);
-            console.log('Current users:', users);
-            
-            // Test the transition manually
-            showPrivilegeWalkView();
-            
-            // After 3 seconds, go back
-            setTimeout(() => {
-                console.log('Going back to main view...');
-                showMainView();
-            }, 3000);
-        }
-        
-        function updateQuestionDisplay(question, questionNumber, totalQuestions) {
-            document.getElementById('questionText').textContent = question;
-            document.getElementById('questionProgress').textContent = 
-                `Question ${questionNumber} of ${totalQuestions}`;
-        }
-        
-        function createUserMarkers() {
-            const container = document.getElementById('walkContainer');
-            const userCount = Object.keys(users).length;
-            const sectionWidth = 100 / userCount;
-            
-            container.innerHTML = '';
-            
-            Object.keys(users).forEach((username, index) => {
-                const marker = document.createElement('div');
-                marker.className = 'user-marker';
-                marker.id = `marker-${username}`;
-                marker.textContent = username;
-                marker.style.left = `${(index * sectionWidth) + (sectionWidth / 2) - 60}px`;
-                marker.style.top = '270px'; // Center vertically
-                container.appendChild(marker);
-            });
-        }
-        
-        function updateUserPositions(positions) {
-            Object.keys(positions).forEach(username => {
-                const marker = document.getElementById(`marker-${username}`);
-                if (marker) {
-                    // Convert position to screen coordinates
-                    // Position ranges from -100 to +100, convert to 0-600px
-                    const screenY = 300 - (positions[username] * 3); // 300 is center, 3 is scale factor
-                    marker.style.top = `${Math.max(0, Math.min(540, screenY))}px`;
-                }
-            });
-        }
-        
+
         function showFinalResults(finalPositions) {
             const finalResults = document.getElementById('finalResults');
             const finalPositionsDiv = document.getElementById('finalPositions');
@@ -777,14 +640,74 @@
             
             finalResults.style.display = 'block';
         }
-        
+
+        function updateQuestionDisplay(question, questionNumber, totalQuestions) {
+            const questionText = document.getElementById('questionText');
+            const questionProgress = document.getElementById('questionProgress');
+            
+            if (questionText) questionText.textContent = question;
+            if (questionProgress) questionProgress.textContent = `Question ${questionNumber} of ${totalQuestions}`;
+        }
+
+        function createUserMarkers() {
+            const container = document.getElementById('walkContainer');
+            const userCount = Object.keys(users).length;
+            const sectionWidth = 100 / userCount;
+            
+            container.innerHTML = '';
+            
+            Object.keys(users).forEach((username, index) => {
+                const marker = document.createElement('div');
+                marker.className = 'user-marker';
+                marker.id = `marker-${username}`;
+                marker.textContent = username;
+                marker.style.left = `${(index * sectionWidth) + (sectionWidth / 2) - 60}px`;
+                marker.style.top = '270px'; // Center vertically
+                container.appendChild(marker);
+            });
+        }
+
+        function updateUserPositions(positions) {
+            Object.keys(positions).forEach(username => {
+                const marker = document.getElementById(`marker-${username}`);
+                if (marker) {
+                    // Convert position to screen coordinates
+                    // Position ranges from -100 to +100, convert to 0-600px
+                    const screenY = 300 - (positions[username] * 3); // 300 is center, 3 is scale factor
+                    marker.style.top = `${Math.max(0, Math.min(540, screenY))}px`;
+                }
+            });
+        }
+
+        function createNewSession() {
+            // Create a completely new session
+            if (confirm('Create a new session? This will generate a new QR code and session ID.')) {
+                window.location.href = '/';
+            }
+        }
+
+        function testViewTransition() {
+            console.log('=== TESTING VIEW TRANSITION ===');
+            console.log('Current session status:', sessionStatus);
+            console.log('Current users:', users);
+            
+            // Test the transition manually
+            showPrivilegeWalkView();
+            
+            // After 3 seconds, go back
+            setTimeout(() => {
+                console.log('Going back to main view...');
+                showMainView();
+            }, 3000);
+        }
+
         // Function to refresh QR code
         function refreshQRCode() {
             const qrImage = document.getElementById('qrCodeImage');
             const timestamp = new Date().getTime();
             qrImage.src = `/qr/{{ session_id }}?t=${timestamp}`;
         }
-        
+
         // Handle go button click
         document.getElementById('goButton').addEventListener('click', async function() {
             console.log('🚀 GO BUTTON CLICKED!');
@@ -810,11 +733,16 @@
                 alert('Error starting session');
             }
         });
-        
-        // Clean up SSE connection when page unloads
+
+        // Start polling when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            startPolling();
+        });
+
+        // Clean up polling when page unloads
         window.addEventListener('beforeunload', function() {
-            if (eventSource) {
-                eventSource.close();
+            if (pollInterval) {
+                clearInterval(pollInterval);
             }
         });
     </script>
