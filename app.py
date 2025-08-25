@@ -21,11 +21,106 @@ app.secret_key = 'your-secret-key-here'
 # In-memory storage for active sessions (will be lost on worker restart, but that's OK)
 active_sessions = {}
 
+def save_sessions_to_file():
+    """Save sessions to file for persistence across redeploys"""
+    try:
+        with open('sessions.json', 'w') as f:
+            json.dump(active_sessions, f, default=str)
+        logger.info(f"Saved {len(active_sessions)} sessions to file")
+    except Exception as e:
+        logger.error(f"Error saving sessions: {str(e)}")
+
+def load_sessions_from_file():
+    """Load sessions from file on startup"""
+    try:
+        with open('sessions.json', 'r') as f:
+            sessions = json.load(f)
+            
+        # Validate and clean session data
+        valid_sessions = {}
+        for session_id, session_data in sessions.items():
+            try:
+                # Basic validation
+                if not isinstance(session_data, dict):
+                    logger.warning(f"Skipping invalid session {session_id}: not a dict")
+                    continue
+                    
+                if 'users' not in session_data or 'status' not in session_data:
+                    logger.warning(f"Skipping invalid session {session_id}: missing required fields")
+                    continue
+                
+                # Convert string timestamps back to datetime objects
+                if 'last_activity' in session_data:
+                    try:
+                        if isinstance(session_data['last_activity'], str):
+                            session_data['last_activity'] = datetime.fromisoformat(session_data['last_activity'])
+                    except Exception as e:
+                        logger.warning(f"Invalid timestamp for session {session_id}: {e}")
+                        session_data['last_activity'] = datetime.now()
+                
+                valid_sessions[session_id] = session_data
+                
+            except Exception as e:
+                logger.error(f"Error processing session {session_id}: {e}")
+                continue
+        
+        active_sessions.update(valid_sessions)
+        logger.info(f"Loaded {len(valid_sessions)} valid sessions from file")
+        
+        # Save cleaned sessions back to file
+        if valid_sessions != sessions:
+            save_sessions_to_file()
+            logger.info("Cleaned sessions saved back to file")
+            
+    except FileNotFoundError:
+        logger.info("No existing sessions file found")
+    except json.JSONDecodeError as e:
+        logger.error(f"Corrupted sessions file: {e}")
+        # Try to backup and remove corrupted file
+        try:
+            import shutil
+            shutil.copy('sessions.json', 'sessions.json.backup')
+            os.remove('sessions.json')
+            logger.info("Corrupted sessions file backed up and removed")
+        except Exception as backup_error:
+            logger.error(f"Failed to backup corrupted file: {backup_error}")
+    except Exception as e:
+        logger.error(f"Error loading sessions: {str(e)}")
+
+def cleanup_old_sessions():
+    """Remove sessions older than 24 hours"""
+    try:
+        cutoff_time = datetime.now().timestamp() - (24 * 60 * 60)  # 24 hours ago
+        sessions_to_remove = []
+        
+        for session_id, session_data in active_sessions.items():
+            if 'last_activity' in session_data:
+                if isinstance(session_data['last_activity'], datetime):
+                    last_activity_timestamp = session_data['last_activity'].timestamp()
+                else:
+                    last_activity_timestamp = datetime.fromisoformat(session_data['last_activity']).timestamp()
+                
+                if last_activity_timestamp < cutoff_time:
+                    sessions_to_remove.append(session_id)
+        
+        for session_id in sessions_to_remove:
+            del active_sessions[session_id]
+            logger.info(f"Cleaned up old session: {session_id}")
+        
+        if sessions_to_remove:
+            save_sessions_to_file()
+            
+    except Exception as e:
+        logger.error(f"Error cleaning up sessions: {str(e)}")
+
 def log_session_state(session_id, action, details=""):
     """Log session state changes for debugging"""
     session_info = active_sessions.get(session_id, {})
     user_count = len(session_info.get('users', {}))
     logger.info(f"SESSION {action}: {session_id} | Users: {user_count} | {details}")
+    
+    # Save sessions to file after each state change
+    save_sessions_to_file()
 
 @app.route('/')
 def index():
@@ -350,6 +445,24 @@ def health_check():
         'total_users': sum(len(session.get('users', {})) for session in active_sessions.values())
     })
 
+@app.route('/cleanup')
+def cleanup_endpoint():
+    """Endpoint to manually trigger session cleanup"""
+    try:
+        cleanup_old_sessions()
+        return jsonify({
+            'status': 'success',
+            'message': 'Session cleanup completed',
+            'active_sessions': len(active_sessions),
+            'timestamp': datetime.now().isoformat()
+        })
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': str(e),
+            'timestamp': datetime.now().isoformat()
+        }), 500
+
 def load_questions():
     """Load questions from JSON file"""
     try:
@@ -377,4 +490,6 @@ def load_questions():
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5001))
     logger.info(f"Starting Flask app on port {port}")
+    cleanup_old_sessions()  # Clean up old sessions first
+    load_sessions_from_file() # Load sessions from file on startup
     app.run(host='0.0.0.0', port=port, debug=False) 

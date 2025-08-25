@@ -52,6 +52,9 @@ instance/
 *.sqlite
 *.sqlite3
 
+# Session persistence
+sessions.json
+
 # IDE and editor files
 .vscode/
 .idea/
