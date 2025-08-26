@@ -323,6 +323,7 @@
                 showQuestionScreen();
                 loadCurrentQuestion();
                 loadRankings();
+                loadPosition(); // Load initial position
             }
             
             // Check if we need to move to next question
@@ -331,6 +332,7 @@
                 hasAnswered = false;
                 loadCurrentQuestion();
                 loadRankings();
+                loadPosition(); // Also load updated position
                 enableAnswerButtons();
             }
             
@@ -396,7 +398,7 @@
         function updatePositionDisplay() {
             const positionElement = document.getElementById('positionValue');
             if (positionElement) {
-                positionElement.textContent = `Your current position: ${userPosition}`;
+                positionElement.textContent = `Your accumulated score: ${userPosition}`;
             }
         }
 
@@ -414,6 +416,10 @@
             document.getElementById('waitingScreen').style.display = 'none';
             document.getElementById('questionScreen').style.display = 'block';
             document.getElementById('thankYouScreen').style.display = 'none';
+            
+            // Load initial position and ranking when question screen is shown
+            loadPosition();
+            loadRankings();
         }
 
         function showThankYouScreen() {
@@ -445,12 +451,13 @@
             }
 
             try {
-                const response = await fetch(`/api/submit_answer/${sessionId}`, {
+                const response = await fetch('/api/submit_answer', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify({
+                        session_id: sessionId,
                         username: username,
                         answer: answer
                     })

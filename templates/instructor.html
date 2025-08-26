@@ -377,24 +377,51 @@
             border-radius: 10px;
             border: 2px solid #ddd;
             margin: 2rem 0;
+            overflow: hidden;
         }
         
-        .score-scale {
+        .walk-grid {
             position: absolute;
-            right: 10px;
-            top: 50%;
-            transform: translateY(-50%);
-            background: rgba(255, 255, 255, 0.9);
-            padding: 1rem;
-            border-radius: 8px;
-            font-size: 0.8rem;
-            color: #666;
-            text-align: center;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            display: grid;
+            /* Grid rows and columns will be set dynamically via JavaScript */
+            gap: 1px;
+            pointer-events: none;
+            z-index: 1;
         }
         
-        .score-scale .score {
-            margin: 0.5rem 0;
+        .grid-cell {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .grid-row-label {
+            position: absolute;
+            left: 10px;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.7rem;
             font-weight: 600;
+            color: #666;
+            z-index: 2;
+        }
+        
+        .grid-column-label {
+            position: absolute;
+            top: 10px;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: #666;
+            z-index: 2;
+            text-align: center;
+            min-width: 80px;
         }
         
         .user-marker {
@@ -409,6 +436,8 @@
             box-shadow: 0 2px 10px rgba(0,0,0,0.2);
             transition: all 0.5s ease;
             font-size: 0.9rem;
+            z-index: 3;
+            transform: translate(-50%, -50%); /* Center the marker on the grid position */
         }
         
         .user-marker.answered {
@@ -575,30 +604,78 @@
             line-height: 1.6;
             font-style: italic;
         }
+        
+        .participant-display {
+            margin-top: 2rem;
+            padding: 1.5rem;
+            background: #f8f9fa;
+            border-radius: 10px;
+            border-left: 4px solid #667eea;
+        }
+        
+        .participant-display h3 {
+            margin: 0 0 1rem 0;
+            color: #333;
+            font-size: 1.1rem;
+        }
+        
+        .participant-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        
+        .participant-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.75rem;
+            background: white;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+        
+        .participant-name {
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .participant-score {
+            font-weight: 600;
+            color: #667eea;
+            font-size: 1.1rem;
+        }
+        
+        .participant-answered {
+            border-left-color: #28a745;
+        }
+        
+        .participant-pending {
+            border-left-color: #ffc107;
+        }
     </style>
 </head>
 <body>
     <div class="header">
-        <h1 class="session-name">Privilege Walk Session</h1>
+        <h1 class="session-name">🚶‍♂️ Privilege Walk Session</h1>
         <p class="session-id">Session ID: {{ session_id }}</p>
-        <div class="header-actions">
-            <button class="resume-btn" onclick="resumeSession()">🔄 Resume Session</button>
-            <a href="/" class="btn">🏠 Back to Home</a>
-        </div>
+        <p class="session-subtitle">Welcome! Scan the QR code below to join this session</p>
     </div>
+    
+
     
     <div class="main-content">
         <div class="left-panel">
-            <h2>📱 Student Join Instructions</h2>
+            <h2>📱 Join This Session</h2>
             
             <div class="qr-container">
                 <div class="qr-instructions">
-                    <h3>How Students Join:</h3>
+                    <h3>How to Join:</h3>
                     <ol>
-                        <li>Students scan this QR code with their phone camera</li>
-                        <li>They'll be taken to a join page</li>
-                        <li>They enter a nickname (can be fake)</li>
-                        <li>They'll see "Please wait" until you start</li>
+                        <li>📱 Scan this QR code with your phone camera</li>
+                        <li>🌐 You'll be taken to a join page</li>
+                        <li>✏️ Enter a nickname (can be fake)</li>
+                        <li>⏳ You'll see "Please wait" until the session starts</li>
                     </ol>
                 </div>
                 
@@ -611,14 +688,14 @@
                 
                 <div class="join-url">
                     <p><strong>Join URL:</strong></p>
-                    <div class="url-display" id="joinUrl">https://privilage-walk.onrender.com/join/{{ session_id }}</div>
+                    <div class="url-display" id="joinUrl">Loading...</div>
                     <button class="copy-btn" onclick="copyJoinURL()">📋 Copy URL</button>
                 </div>
             </div>
             
             <div class="session-controls">
-                <button class="start-btn" id="startBtn" onclick="startSession()">🚀 Start Session</button>
-                <button class="stop-btn" id="stopBtn" onclick="stopSession()" style="display: none;">⏹️ Stop Session</button>
+                <button class="start-btn" id="startBtn">🚀 Begin Privilege Walk</button>
+                <button class="stop-btn" id="stopBtn" onclick="stopSession()" style="display: none;">⏹️ End Session</button>
             </div>
             
             <div class="question-display">
@@ -628,9 +705,13 @@
         </div>
         
         <div class="right-panel">
-            <h2>👥 Connected Students</h2>
+            <h2>👥 Who's Joined</h2>
             <div class="user-count-display">
-                <div class="total-users">Total: <span id="totalUserCount">0</span></div>
+                <div class="total-users">Total Participants: <span id="totalUserCount">0</span></div>
+                <div id="sessionStatusMessage" style="margin-top: 0.5rem; padding: 0.5rem; background: #d4edda; color: #155724; border-radius: 5px; font-size: 0.9rem;">
+                    ✅ Session is ready - participants can join now!
+                </div>
+                <button onclick="manualRefresh()" style="margin-top: 0.5rem; padding: 0.5rem 1rem; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer;">🔄 Refresh List</button>
             </div>
             <div class="question-progress-display" id="questionProgressDisplay" style="display: none;">
                 <h3>📝 Question Progress</h3>
@@ -641,7 +722,15 @@
                 </button>
             </div>
             <div class="user-list" id="userList">
-                <p style="text-align: center; color: #666;">No students joined yet</p>
+                <p style="text-align: center; color: #666;">No participants have joined yet</p>
+            </div>
+            
+            <!-- Participant display during questions -->
+            <div class="participant-display" id="participantDisplay" style="display: none;">
+                <h3>👥 Current Participants & Scores</h3>
+                <div class="participant-list" id="participantList">
+                    <!-- Participants will be displayed here during questions -->
+                </div>
             </div>
         </div>
     </div>
@@ -658,12 +747,10 @@
         </div>
         
         <div class="walk-container" id="walkContainer">
-            <!-- User markers will be dynamically added here -->
-            <div class="score-scale">
-                <div class="score">-12</div>
-                <div class="score">0</div>
-                <div class="score">+12</div>
+            <div class="walk-grid" id="walkGrid">
+                <!-- Grid will be generated dynamically -->
             </div>
+            <!-- User markers will be dynamically added here -->
         </div>
     </div>
     
@@ -700,6 +787,7 @@
         let userAnswers = {};
         let userCount = 0;
         let pollInterval = null;
+        let positionsLoaded = false; // Flag to track if positions have been loaded
 
         function startPolling() {
             // Poll every 2 seconds for updates
@@ -709,6 +797,12 @@
                     if (response.ok) {
                         const data = await response.json();
                         handleStatusUpdate(data);
+                        
+                        // If session is active, also update positions to keep markers in place
+                        // But only if we haven't loaded positions yet or if there are significant changes
+                        if (data.status === 'active' && !positionsLoaded) {
+                            loadUserPositions();
+                        }
                     }
                 } catch (error) {
                     console.error('Polling error:', error);
@@ -718,33 +812,54 @@
 
         function handleStatusUpdate(data) {
             console.log('Status update received:', data);
+            console.log('Previous user count:', userCount, 'Previous users:', users);
             
-            // Update session status
+            // Update user count and list FIRST (regardless of status)
+            const newUserCount = data.user_count || 0;
+            const newUsers = data.users || [];
+            
+            console.log('New user count:', newUserCount, 'New users:', newUsers);
+            
+            // Only update if there are actual changes
+            if (newUserCount !== userCount || JSON.stringify(newUsers) !== JSON.stringify(users)) {
+                userCount = newUserCount;
+                users = newUsers;
+                
+                console.log('User data changed, updating display...');
+                
+                // Update user count display
+                const userCountDisplay = document.getElementById('totalUserCount');
+                if (userCountDisplay) {
+                    userCountDisplay.textContent = userCount;
+                }
+                
+                // Update user list
+                updateUserList();
+                
+                // Update participant display
+                updateParticipantDisplay();
+            }
+            
+            // Then handle session status changes
             if (data.status === 'waiting') {
                 showMainView();
+                // Even in waiting status, we want to show users who have joined
+                console.log('Session is waiting, but users can still join');
             } else if (data.status === 'active') {
                 showPrivilegeWalkView();
                 loadCurrentQuestion();
                 updateQuestionProgress();
                 loadUserPositions();
                 loadUserAnswers();
-                createUserMarkers();
             } else if (data.status === 'finished') {
-                showFinishedView();
+                showFinalView();
             }
             
-            // Update user count and list
-            userCount = data.user_count || 0;
-            users = data.users || [];
+            // Update the session status message
+            updateSessionStatusMessage(data.status);
             
-            // Update user count display
-            const userCountDisplay = document.getElementById('totalUserCount');
-            if (userCountDisplay) {
-                userCountDisplay.textContent = userCount;
-            }
-            
-            // Update user list
-            updateUserList();
+            // Update participant display after status change
+            updateParticipantDisplay();
         }
 
         async function loadCurrentQuestion() {
@@ -755,23 +870,35 @@
                     currentQuestion = data.current_question;
                     totalQuestions = data.total_questions;
                     
-                    // Get the actual question text from the questions endpoint
-                    if (data.status === 'active') {
+                    // Set global variable for grid sizing
+                    window.totalQuestions = totalQuestions;
+                    
+                    // Always try to get the current question text, regardless of status
+                    if (currentQuestion < totalQuestions) {
                         const questionResponse = await fetch(`/api/question/${sessionId}`);
                         if (questionResponse.ok) {
                             const questionData = await questionResponse.json();
                             questionText = questionData.question;
                             
-                            // Update question display
+                            // Update left panel question display
                             const questionDisplay = document.getElementById('questionDisplay');
                             if (questionDisplay) {
                                 questionDisplay.textContent = questionText;
                             }
                         }
+                    } else {
+                        // No more questions, clear the display
+                        const questionDisplay = document.getElementById('questionDisplay');
+                        if (questionDisplay) {
+                            questionDisplay.textContent = 'Session completed - no more questions';
+                        }
                     }
                     
                     // Update question progress
                     updateQuestionProgress();
+                    
+                    // Update participant display when question changes
+                    updateParticipantDisplay();
                 }
             } catch (error) {
                 console.error('Error loading current question:', error);
@@ -784,6 +911,19 @@
                 if (response.ok) {
                     const data = await response.json();
                     updateUserPositions(data.positions);
+                    
+                    // Update participant scores in the display
+                    if (data.positions) {
+                        Object.keys(data.positions).forEach(username => {
+                            const scoreElement = document.getElementById(`score-${username}`);
+                            if (scoreElement) {
+                                scoreElement.textContent = data.positions[username];
+                            }
+                        });
+                    }
+                    
+                    // Mark positions as loaded
+                    positionsLoaded = true;
                 }
             } catch (error) {
                 console.error('Error loading positions:', error);
@@ -814,20 +954,30 @@
 
         async function loadUserCount() {
             try {
+                console.log('loadUserCount called, fetching session status...');
                 const response = await fetch(`/api/session_status/${sessionId}`);
                 if (response.ok) {
                     const data = await response.json();
+                    console.log('loadUserCount received data:', data);
+                    
                     userCount = data.user_count;
                     users = data.users;
+                    
+                    console.log('Updated userCount to:', userCount, 'and users to:', users);
                     
                     // Update user count display
                     const userCountDisplay = document.getElementById('totalUserCount');
                     if (userCountDisplay) {
                         userCountDisplay.textContent = userCount;
+                        console.log('Updated user count display to:', userCount);
+                    } else {
+                        console.error('totalUserCount element not found!');
                     }
                     
                     // Update user list
                     updateUserList();
+                } else {
+                    console.error('loadUserCount failed with status:', response.status);
                 }
             } catch (error) {
                 console.error('Error loading user count:', error);
@@ -835,13 +985,21 @@
         }
         
         function updateUserList() {
+            console.log('updateUserList called with userCount:', userCount, 'users:', users);
+            
             const userList = document.getElementById('userList');
             if (userList) {
                 if (userCount === 0) {
-                    userList.innerHTML = '<p>No students joined yet</p>';
+                    console.log('No users, showing "No participants joined yet" message');
+                    userList.innerHTML = '<p style="text-align: center; color: #666;">No participants have joined yet</p>';
                 } else {
+                    console.log('Building user list HTML for', userCount, 'users');
                     let userListHTML = '';
-                    for (const username of users) {
+                    
+                    // Ensure users is an array
+                    const userArray = Array.isArray(users) ? users : Object.keys(users);
+                    
+                    for (const username of userArray) {
                         const hasAnswered = userAnswers[username] || false;
                         const statusClass = hasAnswered ? 'answered' : 'pending';
                         const statusIcon = hasAnswered ? '✅' : '⏳';
@@ -855,8 +1013,16 @@
                             </div>
                         `;
                     }
+                    console.log('Setting user list HTML:', userListHTML);
                     userList.innerHTML = userListHTML;
+                    
+                    // Also update participant display
+                    updateParticipantDisplay();
+                    
+
                 }
+            } else {
+                console.error('userList element not found!');
             }
         }
 
@@ -880,9 +1046,12 @@
             updateQuestionProgress();
             updateUserList();
             
-            // Update markers if privilege walk view is active
+            // Update participant display to show current answer status
+            updateParticipantDisplay();
+            
+            // Update user positions to keep markers in their correct score-based positions
             if (document.getElementById('privilegeWalkView').style.display !== 'none') {
-                createUserMarkers();
+                loadUserPositions();
             }
         }
 
@@ -908,6 +1077,9 @@
                 
                 // Update user list to reflect current answer status
                 updateUserList();
+                
+                // Update participant display to show current answer status
+                updateParticipantDisplay();
 
                 // Check if all users have answered the current question
                 if (answeredCount === totalUsers && totalUsers > 0) {
@@ -971,12 +1143,27 @@
             document.querySelector('.main-content').style.display = 'flex';
             document.getElementById('privilegeWalkView').style.display = 'none';
             document.getElementById('finalResults').style.display = 'none';
+            
+            // Hide participant display when showing main view
+            const participantDisplay = document.getElementById('participantDisplay');
+            if (participantDisplay) {
+                participantDisplay.style.display = 'none';
+            }
         }
 
-        function showPrivilegeWalkView() {
+        async function showPrivilegeWalkView() {
             document.querySelector('.main-content').style.display = 'none';
             document.getElementById('privilegeWalkView').style.display = 'block';
             document.getElementById('finalResults').style.display = 'none';
+            
+            // Create the walk grid once when the privilege walk starts
+            createWalkGrid();
+            
+            // Create user markers positioned on the grid (now async)
+            await createUserMarkers();
+            
+            // Update participant display when showing privilege walk view
+            updateParticipantDisplay();
         }
 
         async function resetSession() {
@@ -1002,6 +1189,8 @@
                         updateStatus();
                         // Clear previous results
                         document.getElementById('walkContainer').innerHTML = '';
+                        // Reset positions loaded flag
+                        positionsLoaded = false;
                         // Re-enable go button
                         document.getElementById('goButton').disabled = false;
                     }
@@ -1039,56 +1228,205 @@
             if (questionProgress) questionProgress.textContent = `Question ${questionNumber} of ${totalQuestions}`;
         }
 
-        function createUserMarkers() {
+        async function createUserMarkers() {
             const container = document.getElementById('walkContainer');
-            const userCount = Object.keys(users).length;
+            
+            // Clear existing markers
+            const existingMarkers = container.querySelectorAll('.user-marker');
+            existingMarkers.forEach(marker => marker.remove());
+            
+            // Ensure users is an array
+            const userArray = Array.isArray(users) ? users : Object.keys(users);
+            const userCount = userArray.length;
             
             if (userCount === 0) return;
             
-            // Calculate dynamic spacing based on user count
-            let sectionWidth;
-            if (userCount <= 2) {
-                sectionWidth = 100 / userCount; // 50% each for 2 users
-            } else if (userCount <= 10) {
-                sectionWidth = 80 / userCount; // 80% of width, some spacing
-            } else {
-                sectionWidth = 60 / userCount; // 60% of width, more spacing
+            // Get current positions first to position markers correctly from the start
+            try {
+                const response = await fetch(`/api/positions/${sessionId}`);
+                if (response.ok) {
+                    const data = await response.json();
+                    const positions = data.positions || {};
+                    
+                    // Create markers positioned correctly from the start
+                    userArray.forEach((username, index) => {
+                        const marker = document.createElement('div');
+                        marker.className = 'user-marker';
+                        marker.id = `marker-${username}`;
+                        marker.textContent = username;
+                        
+                        // Position marker based on current score (avoid the "jump" effect)
+                        if (positions[username] !== undefined) {
+                            const walkContainer = document.getElementById('walkContainer');
+                            const containerWidth = walkContainer.offsetWidth;
+                            const columnWidth = containerWidth / userCount;
+                            
+                            // Calculate horizontal position (column center)
+                            const leftPosition = (index + 0.5) * columnWidth;
+                            
+                            // Calculate vertical position based on score
+                            const score = positions[username];
+                            const totalQuestions = window.totalQuestions || 12; // Fallback to 12 if not set
+                            const maxScore = totalQuestions;
+                            const minScore = -totalQuestions;
+                            const totalRows = (maxScore - minScore) + 1;
+                            const topPosition = ((maxScore - score) / (totalRows - 1)) * 100; // Flip: minScore = 100%, maxScore = 0%
+                            
+                            console.log(`Positioning ${username}: column ${index}, left=${leftPosition}px, score=${score}, top=${topPosition}%`);
+                            
+                            marker.style.left = `${leftPosition}px`;
+                            marker.style.top = `${topPosition}%`;
+                        } else {
+                            // Fallback to center if no position data yet
+                            marker.style.left = '50%';
+                            marker.style.top = '50%';
+                        }
+                        
+                        // Set initial answer status
+                        const hasAnswered = userAnswers[username] || false;
+                        marker.classList.add(hasAnswered ? 'answered' : 'pending');
+                        
+                        container.appendChild(marker);
+                    });
+                } else {
+                    // Fallback: create markers at center if position fetch fails
+                    userArray.forEach((username, index) => {
+                        const marker = document.createElement('div');
+                        marker.className = 'user-marker';
+                        marker.id = `marker-${username}`;
+                        marker.textContent = username;
+                        
+                        marker.style.left = '50%';
+                        marker.style.top = '50%';
+                        
+                        const hasAnswered = userAnswers[username] || false;
+                        marker.classList.add(hasAnswered ? 'answered' : 'pending');
+                        
+                        container.appendChild(marker);
+                    });
+                }
+            } catch (error) {
+                console.error('Error loading positions for marker creation:', error);
+                // Fallback: create markers at center
+                userArray.forEach((username, index) => {
+                    const marker = document.createElement('div');
+                    marker.className = 'user-marker';
+                    marker.id = `marker-${username}`;
+                    marker.textContent = username;
+                    
+                    marker.style.left = '50%';
+                    marker.style.top = '50%';
+                    
+                    const hasAnswered = userAnswers[username] || false;
+                    marker.classList.add(hasAnswered ? 'answered' : 'pending');
+                    
+                    container.appendChild(marker);
+                });
+            }
+        }
+        
+        function createWalkGrid() {
+            const walkGrid = document.getElementById('walkGrid');
+            const walkContainer = document.getElementById('walkContainer');
+            
+            // Clear existing grid and labels
+            walkGrid.innerHTML = '';
+            const existingLabels = walkContainer.querySelectorAll('.grid-row-label, .grid-column-label');
+            existingLabels.forEach(label => label.remove());
+            
+            // Ensure users is an array
+            const userArray = Array.isArray(users) ? users : Object.keys(users);
+            if (userArray.length === 0) return;
+            
+            // Get the total number of questions for dynamic grid sizing
+            const totalQuestions = window.totalQuestions || 12; // Fallback to 12 if not set
+            const maxScore = totalQuestions;
+            const minScore = -totalQuestions;
+            const totalRows = (maxScore - minScore) + 1; // +1 to include 0
+            
+            const containerWidth = walkContainer.offsetWidth;
+            const containerHeight = walkContainer.offsetHeight;
+            const columnWidth = containerWidth / userArray.length;
+            
+            console.log(`Creating grid: ${totalRows} rows (scores ${minScore} to ${maxScore}), ${userArray.length} columns (users: ${userArray.join(', ')})`);
+            
+            // Set the CSS grid template rows and columns dynamically
+            walkGrid.style.gridTemplateRows = `repeat(${totalRows}, 1fr)`;
+            walkGrid.style.gridTemplateColumns = `repeat(${userArray.length}, 1fr)`;
+            
+            // Create grid cells
+            for (let row = 0; row < totalRows; row++) {
+                for (let col = 0; col < userArray.length; col++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'grid-cell';
+                    walkGrid.appendChild(cell);
+                }
             }
             
-            container.innerHTML = '';
+            // Add row labels (scores)
+            for (let row = 0; row < totalRows; row++) {
+                const score = minScore + row; // From minScore to maxScore
+                const label = document.createElement('div');
+                label.className = 'grid-row-label';
+                label.textContent = score;
+                // Flip the positioning: minScore at bottom, maxScore at top
+                label.style.top = `${((totalRows - 1 - row) / (totalRows - 1)) * 100}%`;
+                walkContainer.appendChild(label);
+            }
             
-            Object.keys(users).forEach((username, index) => {
-                const marker = document.createElement('div');
-                marker.className = 'user-marker';
-                marker.id = `marker-${username}`;
-                marker.textContent = username;
-                
-                // Calculate horizontal position with dynamic spacing
-                const leftPosition = (index * sectionWidth) + (sectionWidth / 2) - 60;
-                marker.style.left = `${Math.max(10, Math.min(container.offsetWidth - 130, leftPosition))}px`;
-                marker.style.top = '270px'; // Center vertically
-                
-                // Set initial answer status
-                const hasAnswered = userAnswers[username] || false;
-                marker.classList.add(hasAnswered ? 'answered' : 'pending');
-                
-                container.appendChild(marker);
+            // Add column labels (usernames)
+            userArray.forEach((username, col) => {
+                const label = document.createElement('div');
+                label.className = 'grid-column-label';
+                label.textContent = username;
+                label.style.left = `${(col + 0.5) * columnWidth}px`;
+                walkContainer.appendChild(label);
             });
         }
 
         function updateUserPositions(positions) {
+            if (!positions) return;
+            
+            const walkContainer = document.getElementById('walkContainer');
+            const containerWidth = walkContainer.offsetWidth;
+            const containerHeight = walkContainer.offsetHeight;
+            
+            // Ensure users is an array
+            const userArray = Array.isArray(users) ? users : Object.keys(users);
+            const userCount = userArray.length;
+            
+            if (userCount === 0) return;
+            
+            const columnWidth = containerWidth / userCount;
+            
             Object.keys(positions).forEach(username => {
                 const marker = document.getElementById(`marker-${username}`);
                 if (marker) {
-                    // Convert accumulated position to screen coordinates
-                    // Position ranges from -12 to +12, convert to 0-600px
-                    // Center at 300px, scale so -12 = 0px, +12 = 600px
-                    const screenY = 300 - (positions[username] * 25); // 300 is center, 25px per point
-                    marker.style.top = `${Math.max(0, Math.min(540, screenY))}px`;
+                    // Find user's column index
+                    const userIndex = userArray.indexOf(username);
+                    if (userIndex === -1) return;
+                    
+                    // Calculate horizontal position (column center)
+                    const leftPosition = (userIndex + 0.5) * columnWidth;
+                    
+                    // Calculate vertical position based on score
+                    // Score ranges from -totalQuestions to +totalQuestions, convert to 0-100%
+                    // minScore should be at bottom (100%), maxScore should be at top (0%)
+                    const score = positions[username];
+                    const totalQuestions = window.totalQuestions || 12; // Fallback to 12 if not set
+                    const maxScore = totalQuestions;
+                    const minScore = -totalQuestions;
+                    const totalRows = (maxScore - minScore) + 1;
+                    const topPosition = ((maxScore - score) / (totalRows - 1)) * 100; // Flip: minScore = 100%, maxScore = 0%
+                    
+                    // Position marker on the grid
+                    marker.style.left = `${leftPosition}px`;
+                    marker.style.top = `${topPosition}%`;
                     
                     // Update answer status
                     const hasAnswered = userAnswers[username] || false;
-                    marker.className = `user-marker ${hasAnswered ? 'answered' : 'pending'}`;
+                    marker.classList.remove('answered', 'pending');
+                    marker.classList.add(hasAnswered ? 'answered' : 'pending');
                 }
             });
             
@@ -1133,7 +1471,9 @@
 
         // Function to copy join URL to clipboard
         function copyJoinURL() {
-            const joinURL = `https://privilage-walk.onrender.com/join/${sessionId}`;
+            const joinUrlElement = document.getElementById('joinUrl');
+            const joinURL = joinUrlElement ? joinUrlElement.textContent : `{{ base_url }}/join/${sessionId}`;
+            
             navigator.clipboard.writeText(joinURL).then(() => {
                 alert('Join URL copied to clipboard!');
             }).catch(() => {
@@ -1148,9 +1488,9 @@
             });
         }
 
-        // Handle go button click
-        document.getElementById('goButton').addEventListener('click', async function() {
-            console.log('🚀 GO BUTTON CLICKED!');
+        // Handle start button click
+        document.getElementById('startBtn').addEventListener('click', async function() {
+            console.log('🚀 START BUTTON CLICKED!');
             try {
                 console.log('Sending start session request...');
                 const response = await fetch('/api/start_session', {
@@ -1167,10 +1507,46 @@
                     alert('Error starting session: ' + data.error);
                 } else {
                     console.log('✅ Session start request successful');
+                    // Hide start button, show stop button
+                    document.getElementById('startBtn').style.display = 'none';
+                    document.getElementById('stopBtn').style.display = 'inline-block';
+                    
+                    // Update participant display to show during active session
+                    updateParticipantDisplay();
+                    
+                    // Load the first question and update display
+                    await loadCurrentQuestion();
                 }
             } catch (error) {
                 console.error('Error:', error);
                 alert('Error starting session');
+            }
+        });
+
+        // Handle stop button click
+        document.getElementById('stopBtn').addEventListener('click', async function() {
+            console.log('⏹️ STOP BUTTON CLICKED!');
+            try {
+                // For now, just reset the session
+                const response = await fetch('/api/reset_session', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ session_id: sessionId })
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    // Show start button, hide stop button
+                    document.getElementById('startBtn').style.display = 'inline-block';
+                    document.getElementById('stopBtn').style.display = 'none';
+                    // Reset to main view
+                    showMainView();
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Error stopping session');
             }
         });
 
@@ -1193,7 +1569,10 @@
                     await loadCurrentQuestion();
                     updateQuestionProgress();
                     // Re-create user markers to update their positions
-                    createUserMarkers();
+                    await createUserMarkers();
+                    
+                    // Update participant display for new question
+                    updateParticipantDisplay();
                 } else {
                     alert('Error advancing question: ' + data.error);
                 }
@@ -1222,7 +1601,10 @@
                     await loadCurrentQuestion();
                     updateQuestionProgress();
                     // Re-create user markers to update their positions
-                    createUserMarkers();
+                    await createUserMarkers();
+                    
+                    // Update participant display for new question
+                    updateParticipantDisplay();
                 } else {
                     alert('Error advancing question: ' + data.error);
                 }
@@ -1232,13 +1614,95 @@
             }
         }
         
-        function resumeSession() {
+        async function resumeSession() {
             // Reload all session data
             loadCurrentQuestion();
             updateQuestionProgress();
             loadUserPositions();
             loadUserAnswers();
-            createUserMarkers();
+            await createUserMarkers();
+            
+            // Update participant display
+            updateParticipantDisplay();
+        }
+        
+        function manualRefresh() {
+            console.log('Manual refresh requested...');
+            loadUserCount();
+            loadCurrentQuestion();
+            
+            // Also update participant display
+            updateParticipantDisplay();
+        }
+        
+
+        
+
+        
+        function updateSessionStatusMessage(status) {
+            const statusMessage = document.getElementById('sessionStatusMessage');
+            if (statusMessage) {
+                if (status === 'waiting') {
+                    statusMessage.innerHTML = '✅ Session is ready - participants can join now!';
+                    statusMessage.style.background = '#d4edda';
+                    statusMessage.style.color = '#155724';
+                } else if (status === 'active') {
+                    statusMessage.innerHTML = '🚀 Session is in progress - questions are active';
+                    statusMessage.style.background = '#fff3cd';
+                    statusMessage.style.color = '#856404';
+                } else if (status === 'finished') {
+                    statusMessage.innerHTML = '🏁 Session completed';
+                    statusMessage.style.background = '#d1ecf1';
+                    statusMessage.style.color = '#0c5460';
+                }
+            }
+            
+            // Also update the question display when status changes
+            if (status === 'active') {
+                // Load the current question when session becomes active
+                loadCurrentQuestion();
+            }
+        }
+        
+        function updateParticipantDisplay() {
+            const participantDisplay = document.getElementById('participantDisplay');
+            const participantList = document.getElementById('participantList');
+            
+            if (participantDisplay && participantList) {
+                if (userCount === 0) {
+                    participantDisplay.style.display = 'none';
+                    return;
+                }
+                
+                // Show participant display during active sessions
+                if (currentQuestion > 0 || document.getElementById('privilegeWalkView').style.display !== 'none') {
+                    participantDisplay.style.display = 'block';
+                    
+                    // Ensure users is an array
+                    const userArray = Array.isArray(users) ? users : Object.keys(users);
+                    
+                    let participantHTML = '';
+                    for (const username of userArray) {
+                        const hasAnswered = currentQuestion > 0 ? (userAnswers[username] || false) : false;
+                        const statusClass = hasAnswered ? 'participant-answered' : 'participant-pending';
+                        const statusIcon = hasAnswered ? '✅' : '⏳';
+                        
+                        participantHTML += `
+                            <div class="participant-item ${statusClass}">
+                                <div class="participant-info">
+                                    <span class="participant-name">${username}</span>
+                                    <span class="participant-status">${statusIcon} ${hasAnswered ? 'Answered' : 'Pending'}</span>
+                                </div>
+                                <div class="participant-score" id="score-${username}">--</div>
+                            </div>
+                        `;
+                    }
+                    
+                    participantList.innerHTML = participantHTML;
+                } else {
+                    participantDisplay.style.display = 'none';
+                }
+            }
         }
         
         function refreshQRCode() {
@@ -1249,7 +1713,9 @@
         }
         
         function copyJoinURL() {
-            const joinURL = `https://privilage-walk.onrender.com/join/${sessionId}`;
+            const joinUrlElement = document.getElementById('joinUrl');
+            const joinURL = joinUrlElement ? joinUrlElement.textContent : `{{ base_url }}/join/${sessionId}`;
+            
             navigator.clipboard.writeText(joinURL).then(() => {
                 alert('Join URL copied to clipboard!');
             }).catch(() => {
@@ -1268,13 +1734,27 @@
         document.addEventListener('DOMContentLoaded', function() {
             console.log('Instructor page loaded, starting polling...');
             
-            // Load initial data
+            // Set the join URL dynamically
+            const joinUrlElement = document.getElementById('joinUrl');
+            if (joinUrlElement) {
+                const baseUrl = '{{ base_url }}'; // Use the server-provided base URL
+                const joinUrl = `${baseUrl}/join/${sessionId}`;
+                joinUrlElement.textContent = joinUrl;
+                console.log('Join URL set to:', joinUrl);
+            }
+            
+            // Load initial data immediately
             loadUserCount();
             loadCurrentQuestion();
             
             // Start polling for updates
             startPolling();
+            
+            // Also update the session status message initially
+            updateSessionStatusMessage('waiting');
         });
+        
+
 
         // Clean up polling when page unloads
         window.addEventListener('beforeunload', function() {

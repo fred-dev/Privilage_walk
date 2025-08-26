@@ -7,6 +7,10 @@ from datetime import datetime
 from flask import Flask, render_template, request, jsonify, session, send_file, Response
 from io import BytesIO
 import qrcode
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 # Configure comprehensive logging
 logging.basicConfig(
@@ -16,7 +20,6 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
-app.secret_key = 'your-secret-key-here'
 
 # In-memory storage for active sessions (will be lost on worker restart, but that's OK)
 active_sessions = {}
@@ -157,27 +160,28 @@ def instructor_view(session_id):
     
     log_session_state(session_id, "INSTRUCTOR_VIEW_ACCESSED")
     
-    # Get actual network IP address that other computers can reach
-    import socket
-    try:
-        # Create a socket to get the local IP address
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        # Connect to a remote address (doesn't actually send data)
-        s.connect(("8.8.8.8", 80))
-        local_ip = s.getsockname()[0]
-        s.close()
-    except:
-        # Fallback to hostname method
+    # Get the same network IP that the QR code uses
+    base_url = None
+    is_local_testing = os.environ.get('LOCAL_TESTING', 'false').lower() == 'true'
+    
+    if is_local_testing:
         try:
-            hostname = socket.gethostname()
-            local_ip = socket.gethostbyname(hostname)
-        except:
-            local_ip = "127.0.0.1"
+            import socket
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.connect(("8.8.8.8", 80))
+            local_ip = s.getsockname()[0]
+            s.close()
+            base_url = f'http://{local_ip}:5001'
+        except Exception as e:
+            logger.warning(f"Could not detect local IP, falling back to localhost: {e}")
+            base_url = 'http://127.0.0.1:5001'
+    else:
+        base_url = 'https://privilage-walk.onrender.com'
     
     return render_template('instructor.html', 
                          session_id=session_id,
                          session_name="Privilege Walk Session",
-                         network_ip=local_ip)
+                         base_url=base_url)
 
 @app.route('/join/<session_id>')
 def student_join(session_id):
@@ -216,8 +220,28 @@ def qr_code(session_id):
     if session_id not in active_sessions:
         return "Session not found", 404
     
-    # Always use Render domain for production
-    join_url = f'https://privilage-walk.onrender.com/join/{session_id}'
+    # Check if we're in local testing mode
+    is_local_testing = os.environ.get('LOCAL_TESTING', 'false').lower() == 'true'
+    
+    if is_local_testing:
+        # Detect local network IP address for development
+        try:
+            import socket
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.connect(("8.8.8.8", 80))
+            local_ip = s.getsockname()[0]
+            s.close()
+            base_url = f'http://{local_ip}:5001'
+            logger.info(f"Local testing mode - using network IP: {base_url}")
+        except Exception as e:
+            logger.warning(f"Could not detect local IP, falling back to localhost: {e}")
+            base_url = 'http://localhost:5001'
+    else:
+        # Production mode - use fixed Render URL
+        base_url = 'https://privilage-walk.onrender.com'
+        logger.info("Production mode - using Render URL")
+    
+    join_url = f'{base_url}/join/{session_id}'
     
     # Create QR code pointing to the correct URL
     qr = qrcode.QRCode(version=1, box_size=10, border=5)
@@ -226,7 +250,6 @@ def qr_code(session_id):
     
     img = qr.make_image(fill_color="black", back_color="white")
     
-    # Convert to bytes
     img_io = BytesIO()
     img.save(img_io, 'PNG')
     img_io.seek(0)
@@ -277,7 +300,7 @@ def api_start_session():
     return jsonify({'success': True})
 
 @app.route('/api/submit_answer', methods=['POST'])
-def submit_answer(session_id):
+def submit_answer():
     """Submit a student's answer"""
     data = request.get_json()
     session_id = data.get('session_id')

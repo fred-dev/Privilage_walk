@@ -1,0 +1,4 @@
+---
+description: This project is to be deployed on render. It must also be tested on the dev machine.
+alwaysApply: false
+---
