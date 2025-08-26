@@ -410,19 +410,7 @@
             z-index: 2;
         }
         
-        .grid-column-label {
-            position: absolute;
-            top: 10px;
-            background: rgba(255, 255, 255, 0.9);
-            padding: 0.25rem 0.5rem;
-            border-radius: 4px;
-            font-size: 0.7rem;
-            font-weight: 600;
-            color: #666;
-            z-index: 2;
-            text-align: center;
-            min-width: 80px;
-        }
+
         
         .user-marker {
             position: absolute;
@@ -801,14 +789,12 @@
                         const data = await response.json();
                         await handleStatusUpdate(data);
                         
-                        // If session is active, check if we need to update positions
-                        // Only update if there are actual changes to prevent flashing
+                        // If session is active, DO NOT update positions during regular polling
+                        // This prevents the flashing effect - positions only update on real score changes
                         if (data.status === 'active') {
-                            // Check if there are new answers or question changes that require position updates
-                            const needsPositionUpdate = checkIfPositionsNeedUpdate(data);
-                            if (needsPositionUpdate) {
-                                loadUserPositions();
-                            }
+                            // Positions are updated separately when there are actual score changes
+                            // Not during regular status polling to prevent flashing
+                            console.log('Session active - positions stable during polling');
                         }
                     }
                 } catch (error) {
@@ -1058,10 +1044,9 @@
             // Update participant display to show current answer status
             updateParticipantDisplay();
             
-            // Update user positions to keep markers in their correct score-based positions
-            if (document.getElementById('privilegeWalkView').style.display !== 'none') {
-                loadUserPositions();
-            }
+            // Only update positions when there are actual score changes, not on every status update
+            // This prevents the flashing effect during regular polling
+            // Positions will be updated separately when scores actually change
         }
 
         function updateQuestionProgress() {
@@ -1099,6 +1084,10 @@
                         </div>
                     `;
                     nextQuestionBtn.style.display = 'block'; // Show next question button
+                    
+                    // All users answered - this triggers score changes, so update positions
+                    console.log('All users answered - updating positions due to score changes');
+                    loadUserPositions();
                 } else {
                     questionProgressDisplay.classList.remove('all-answered');
                     nextQuestionBtn.style.display = 'none'; // Hide next question button
@@ -1383,10 +1372,10 @@
             walkGrid.innerHTML = '';
             
             // Remove ALL existing labels from the container
-            const allLabels = walkContainer.querySelectorAll('.grid-row-label, .grid-column-label');
+            const allLabels = walkContainer.querySelectorAll('.grid-row-label');
             allLabels.forEach(label => {
                 label.remove();
-                console.log('Removed label:', label.textContent);
+                console.log('Removed row label:', label.textContent);
             });
             
             // Set the CSS grid template rows and columns dynamically
@@ -1414,16 +1403,8 @@
                 console.log(`Created row label: ${score} at position ${((totalRows - 1 - row) / (totalRows - 1)) * 100}%`);
             }
             
-            // Add column labels (usernames) - only create one per user
-            userArray.forEach((username, col) => {
-                const label = document.createElement('div');
-                label.className = 'grid-column-label';
-                label.textContent = username;
-                const leftPosition = (col + 0.5) * (walkContainer.offsetWidth / userArray.length);
-                label.style.left = `${leftPosition}px`;
-                walkContainer.appendChild(label);
-                console.log(`Created column label: ${username} at position ${leftPosition}px`);
-            });
+            // Column labels removed - user markers already show usernames and move with scores
+            // No need for duplicate username displays
             
             // Mark grid as created
             gridCreated = true;
@@ -1782,42 +1763,29 @@
             });
         }
 
-        // Function to check if positions need updating (prevents unnecessary flashing)
-        function checkIfPositionsNeedUpdate(data) {
-            // Check if question has changed
-            if (data.current_question !== undefined && data.current_question !== lastKnownQuestion) {
-                lastKnownQuestion = data.current_question;
-                console.log('Question changed, positions need update');
-                return true;
-            }
+        // Function to check for REAL changes that require position updates (prevents flashing)
+        function checkForRealChanges(data) {
+            // Only update positions if there are actual score changes
+            // This is the most restrictive check to prevent any flashing
             
-            // Check if user answers have changed
-            if (data.user_answers) {
-                const currentAnswers = JSON.stringify(data.user_answers);
-                const lastAnswers = JSON.stringify(userAnswers);
-                if (currentAnswers !== lastAnswers) {
-                    console.log('User answers changed, positions need update');
-                    return true;
-                }
-            }
-            
-            // Check if user count has changed
-            if (data.user_count !== userCount) {
-                console.log('User count changed, positions need update');
-                return true;
-            }
-            
-            // Check if positions have actually changed (most important check)
+            // Check if positions have actually changed (only real score changes)
             if (data.positions && lastKnownPositions) {
                 const currentPositions = JSON.stringify(data.positions);
                 const lastPositions = JSON.stringify(lastKnownPositions);
                 if (currentPositions !== lastPositions) {
-                    console.log('Positions changed, update needed');
+                    console.log('Real score changes detected, updating positions');
                     return true;
                 }
             }
             
-            // No significant changes detected
+            // Check if question has changed (new question started)
+            if (data.current_question !== undefined && data.current_question !== lastKnownQuestion) {
+                lastKnownQuestion = data.current_question;
+                console.log('New question started, updating positions');
+                return true;
+            }
+            
+            // No real changes that require position updates
             return false;
         }
         
