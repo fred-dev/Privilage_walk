@@ -788,6 +788,9 @@
         let userCount = 0;
         let pollInterval = null;
         let positionsLoaded = false; // Flag to track if positions have been loaded
+        let lastKnownPositions = {}; // Store last known positions to detect changes
+        let lastKnownQuestion = 0; // Store last known question to detect changes
+        let gridCreated = false; // Flag to track if grid has been created
 
         function startPolling() {
             // Poll every 2 seconds for updates
@@ -798,10 +801,14 @@
                         const data = await response.json();
                         handleStatusUpdate(data);
                         
-                        // If session is active, also update positions to keep markers in place
-                        // But only if we haven't loaded positions yet or if there are significant changes
-                        if (data.status === 'active' && !positionsLoaded) {
-                            loadUserPositions();
+                        // If session is active, check if we need to update positions
+                        // Only update if there are actual changes to prevent flashing
+                        if (data.status === 'active') {
+                            // Check if there are new answers or question changes that require position updates
+                            const needsPositionUpdate = checkIfPositionsNeedUpdate(data);
+                            if (needsPositionUpdate) {
+                                loadUserPositions();
+                            }
                         }
                     }
                 } catch (error) {
@@ -921,6 +928,9 @@
                             }
                         });
                     }
+                    
+                    // Store current positions for change detection
+                    lastKnownPositions = { ...data.positions };
                     
                     // Mark positions as loaded
                     positionsLoaded = true;
@@ -1191,6 +1201,8 @@
                         document.getElementById('walkContainer').innerHTML = '';
                         // Reset positions loaded flag
                         positionsLoaded = false;
+                        // Reset grid created flag
+                        gridCreated = false;
                         // Re-enable go button
                         document.getElementById('goButton').disabled = false;
                     }
@@ -1329,10 +1341,30 @@
             const walkGrid = document.getElementById('walkGrid');
             const walkContainer = document.getElementById('walkContainer');
             
-            // Clear existing grid and labels
+            // Check if grid already exists and has the right dimensions
+            if (gridCreated) {
+                const existingUserCount = walkContainer.querySelectorAll('.grid-column-label').length;
+                const existingRowCount = walkContainer.querySelectorAll('.grid-row-label').length;
+                const expectedUserCount = Array.isArray(users) ? users.length : Object.keys(users).length;
+                const expectedRowCount = (window.totalQuestions || 12) * 2 + 1;
+                
+                if (existingUserCount === expectedUserCount && existingRowCount === expectedRowCount) {
+                    console.log('Grid already exists with correct dimensions, skipping recreation');
+                    return;
+                }
+            }
+            
+            // Clear existing grid and labels - be more thorough
             walkGrid.innerHTML = '';
-            const existingLabels = walkContainer.querySelectorAll('.grid-row-label, .grid-column-label');
-            existingLabels.forEach(label => label.remove());
+            
+            // Remove ALL existing labels to prevent duplicates
+            const existingRowLabels = walkContainer.querySelectorAll('.grid-row-label');
+            const existingColumnLabels = walkContainer.querySelectorAll('.grid-column-label');
+            
+            existingRowLabels.forEach(label => label.remove());
+            existingColumnLabels.forEach(label => label.remove());
+            
+            console.log(`Cleaned up ${existingRowLabels.length} row labels and ${existingColumnLabels.length} column labels`);
             
             // Ensure users is an array
             const userArray = Array.isArray(users) ? users : Object.keys(users);
@@ -1363,7 +1395,7 @@
                 }
             }
             
-            // Add row labels (scores)
+            // Add row labels (scores) - ensure we go from minScore to maxScore
             for (let row = 0; row < totalRows; row++) {
                 const score = minScore + row; // From minScore to maxScore
                 const label = document.createElement('div');
@@ -1374,7 +1406,7 @@
                 walkContainer.appendChild(label);
             }
             
-            // Add column labels (usernames)
+            // Add column labels (usernames) - only create one per user
             userArray.forEach((username, col) => {
                 const label = document.createElement('div');
                 label.className = 'grid-column-label';
@@ -1382,6 +1414,10 @@
                 label.style.left = `${(col + 0.5) * columnWidth}px`;
                 walkContainer.appendChild(label);
             });
+            
+            // Mark grid as created
+            gridCreated = true;
+            console.log('Grid created successfully');
         }
 
         function updateUserPositions(positions) {
@@ -1429,6 +1465,9 @@
                     marker.classList.add(hasAnswered ? 'answered' : 'pending');
                 }
             });
+            
+            // Store current positions for change detection
+            lastKnownPositions = { ...positions };
             
             // Update user list to reflect answer status
             updateUserList();
@@ -1730,6 +1769,45 @@
             });
         }
 
+        // Function to check if positions need updating (prevents unnecessary flashing)
+        function checkIfPositionsNeedUpdate(data) {
+            // Check if question has changed
+            if (data.current_question !== undefined && data.current_question !== lastKnownQuestion) {
+                lastKnownQuestion = data.current_question;
+                console.log('Question changed, positions need update');
+                return true;
+            }
+            
+            // Check if user answers have changed
+            if (data.user_answers) {
+                const currentAnswers = JSON.stringify(data.user_answers);
+                const lastAnswers = JSON.stringify(userAnswers);
+                if (currentAnswers !== lastAnswers) {
+                    console.log('User answers changed, positions need update');
+                    return true;
+                }
+            }
+            
+            // Check if user count has changed
+            if (data.user_count !== userCount) {
+                console.log('User count changed, positions need update');
+                return true;
+            }
+            
+            // Check if positions have actually changed (most important check)
+            if (data.positions && lastKnownPositions) {
+                const currentPositions = JSON.stringify(data.positions);
+                const lastPositions = JSON.stringify(lastKnownPositions);
+                if (currentPositions !== lastPositions) {
+                    console.log('Positions changed, update needed');
+                    return true;
+                }
+            }
+            
+            // No significant changes detected
+            return false;
+        }
+        
         // Start polling when page loads
         document.addEventListener('DOMContentLoaded', function() {
             console.log('Instructor page loaded, starting polling...');
