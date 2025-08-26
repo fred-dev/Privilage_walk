@@ -799,7 +799,7 @@
                     const response = await fetch(`/api/session_status/${sessionId}`);
                     if (response.ok) {
                         const data = await response.json();
-                        handleStatusUpdate(data);
+                        await handleStatusUpdate(data);
                         
                         // If session is active, check if we need to update positions
                         // Only update if there are actual changes to prevent flashing
@@ -817,7 +817,7 @@
             }, 2000);
         }
 
-        function handleStatusUpdate(data) {
+        async function handleStatusUpdate(data) {
             console.log('Status update received:', data);
             console.log('Previous user count:', userCount, 'Previous users:', users);
             
@@ -853,8 +853,7 @@
                 // Even in waiting status, we want to show users who have joined
                 console.log('Session is waiting, but users can still join');
             } else if (data.status === 'active') {
-                showPrivilegeWalkView();
-                loadCurrentQuestion();
+                await showPrivilegeWalkView();
                 updateQuestionProgress();
                 loadUserPositions();
                 loadUserAnswers();
@@ -1166,6 +1165,9 @@
             document.getElementById('privilegeWalkView').style.display = 'block';
             document.getElementById('finalResults').style.display = 'none';
             
+            // Load current question data first to set window.totalQuestions
+            await loadCurrentQuestion();
+            
             // Create the walk grid once when the privilege walk starts
             createWalkGrid();
             
@@ -1193,7 +1195,7 @@
                         // Hide final results
                         document.getElementById('finalResults').style.display = 'none';
                         // Show privilege walk view again
-                        showPrivilegeWalkView();
+                        await showPrivilegeWalkView();
                         // Reset session state
                         sessionStatus = 'waiting';
                         updateStatus();
@@ -1243,15 +1245,30 @@
         async function createUserMarkers() {
             const container = document.getElementById('walkContainer');
             
+            console.log('=== MARKER CREATION START ===');
+            console.log('Current users object:', users);
+            console.log('Users type:', typeof users);
+            console.log('Users is array:', Array.isArray(users));
+            
             // Clear existing markers
             const existingMarkers = container.querySelectorAll('.user-marker');
-            existingMarkers.forEach(marker => marker.remove());
+            console.log(`Found ${existingMarkers.length} existing markers, removing them...`);
+            existingMarkers.forEach(marker => {
+                console.log('Removing marker:', marker.textContent);
+                marker.remove();
+            });
             
             // Ensure users is an array
             const userArray = Array.isArray(users) ? users : Object.keys(users);
             const userCount = userArray.length;
             
-            if (userCount === 0) return;
+            console.log(`User array: [${userArray.join(', ')}]`);
+            console.log(`User count: ${userCount}`);
+            
+            if (userCount === 0) {
+                console.log('No users, skipping marker creation');
+                return;
+            }
             
             // Get current positions first to position markers correctly from the start
             try {
@@ -1281,7 +1298,7 @@
                             const totalQuestions = window.totalQuestions || 12; // Fallback to 12 if not set
                             const maxScore = totalQuestions;
                             const minScore = -totalQuestions;
-                            const totalRows = (maxScore - minScore) + 1;
+                            const totalRows = (2 * totalQuestions) + 1;
                             const topPosition = ((maxScore - score) / (totalRows - 1)) * 100; // Flip: minScore = 100%, maxScore = 0%
                             
                             console.log(`Positioning ${username}: column ${index}, left=${leftPosition}px, score=${score}, top=${topPosition}%`);
@@ -1341,46 +1358,36 @@
             const walkGrid = document.getElementById('walkGrid');
             const walkContainer = document.getElementById('walkContainer');
             
-            // Check if grid already exists and has the right dimensions
-            if (gridCreated) {
-                const existingUserCount = walkContainer.querySelectorAll('.grid-column-label').length;
-                const existingRowCount = walkContainer.querySelectorAll('.grid-row-label').length;
-                const expectedUserCount = Array.isArray(users) ? users.length : Object.keys(users).length;
-                const expectedRowCount = (window.totalQuestions || 12) * 2 + 1;
-                
-                if (existingUserCount === expectedUserCount && existingRowCount === expectedRowCount) {
-                    console.log('Grid already exists with correct dimensions, skipping recreation');
-                    return;
-                }
-            }
-            
-            // Clear existing grid and labels - be more thorough
-            walkGrid.innerHTML = '';
-            
-            // Remove ALL existing labels to prevent duplicates
-            const existingRowLabels = walkContainer.querySelectorAll('.grid-row-label');
-            const existingColumnLabels = walkContainer.querySelectorAll('.grid-column-label');
-            
-            existingRowLabels.forEach(label => label.remove());
-            existingColumnLabels.forEach(label => label.remove());
-            
-            console.log(`Cleaned up ${existingRowLabels.length} row labels and ${existingColumnLabels.length} column labels`);
+            console.log('=== GRID CREATION START ===');
+            console.log('Current users:', users);
+            console.log('Current totalQuestions:', window.totalQuestions);
             
             // Ensure users is an array
             const userArray = Array.isArray(users) ? users : Object.keys(users);
-            if (userArray.length === 0) return;
+            if (userArray.length === 0) {
+                console.log('No users, skipping grid creation');
+                return;
+            }
             
             // Get the total number of questions for dynamic grid sizing
             const totalQuestions = window.totalQuestions || 12; // Fallback to 12 if not set
             const maxScore = totalQuestions;
             const minScore = -totalQuestions;
-            const totalRows = (maxScore - minScore) + 1; // +1 to include 0
+            const totalRows = (2 * totalQuestions) + 1; // 2 * questions + 1 to include 0
             
-            const containerWidth = walkContainer.offsetWidth;
-            const containerHeight = walkContainer.offsetHeight;
-            const columnWidth = containerWidth / userArray.length;
+            console.log(`Grid dimensions: ${totalRows} rows (scores ${minScore} to ${maxScore}), ${userArray.length} columns`);
+            console.log(`Calculation: 2 * ${totalQuestions} + 1 = ${totalRows} rows`);
+            console.log(`Score range: ${minScore} to ${maxScore} (should be -${totalQuestions} to +${totalQuestions})`);
             
-            console.log(`Creating grid: ${totalRows} rows (scores ${minScore} to ${maxScore}), ${userArray.length} columns (users: ${userArray.join(', ')})`);
+            // COMPLETELY CLEAR everything first
+            walkGrid.innerHTML = '';
+            
+            // Remove ALL existing labels from the container
+            const allLabels = walkContainer.querySelectorAll('.grid-row-label, .grid-column-label');
+            allLabels.forEach(label => {
+                label.remove();
+                console.log('Removed label:', label.textContent);
+            });
             
             // Set the CSS grid template rows and columns dynamically
             walkGrid.style.gridTemplateRows = `repeat(${totalRows}, 1fr)`;
@@ -1404,6 +1411,7 @@
                 // Flip the positioning: minScore at bottom, maxScore at top
                 label.style.top = `${((totalRows - 1 - row) / (totalRows - 1)) * 100}%`;
                 walkContainer.appendChild(label);
+                console.log(`Created row label: ${score} at position ${((totalRows - 1 - row) / (totalRows - 1)) * 100}%`);
             }
             
             // Add column labels (usernames) - only create one per user
@@ -1411,13 +1419,18 @@
                 const label = document.createElement('div');
                 label.className = 'grid-column-label';
                 label.textContent = username;
-                label.style.left = `${(col + 0.5) * columnWidth}px`;
+                const leftPosition = (col + 0.5) * (walkContainer.offsetWidth / userArray.length);
+                label.style.left = `${leftPosition}px`;
                 walkContainer.appendChild(label);
+                console.log(`Created column label: ${username} at position ${leftPosition}px`);
             });
             
             // Mark grid as created
             gridCreated = true;
-            console.log('Grid created successfully');
+            console.log('=== GRID CREATION COMPLETE ===');
+            console.log(`Final grid: ${totalRows} rows, ${userArray.length} columns`);
+            console.log(`Row labels created: ${walkContainer.querySelectorAll('.grid-row-label').length}`);
+            console.log(`Column labels created: ${walkContainer.querySelectorAll('.grid-column-label').length}`);
         }
 
         function updateUserPositions(positions) {
@@ -1452,7 +1465,7 @@
                     const totalQuestions = window.totalQuestions || 12; // Fallback to 12 if not set
                     const maxScore = totalQuestions;
                     const minScore = -totalQuestions;
-                    const totalRows = (maxScore - minScore) + 1;
+                    const totalRows = (2 * totalQuestions) + 1;
                     const topPosition = ((maxScore - score) / (totalRows - 1)) * 100; // Flip: minScore = 100%, maxScore = 0%
                     
                     // Position marker on the grid
@@ -1480,13 +1493,13 @@
             }
         }
 
-        function testViewTransition() {
+        async function testViewTransition() {
             console.log('=== TESTING VIEW TRANSITION ===');
             console.log('Current session status:', sessionStatus);
             console.log('Current users:', users);
             
             // Test the transition manually
-            showPrivilegeWalkView();
+            await showPrivilegeWalkView();
             
             // After 3 seconds, go back
             setTimeout(() => {
