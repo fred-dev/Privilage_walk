@@ -7,10 +7,14 @@ from datetime import datetime
 from flask import Flask, render_template, request, jsonify, session, send_file, Response
 from io import BytesIO
 import qrcode
-from dotenv import load_dotenv
-
-# Load environment variables
-load_dotenv()
+try:
+    from dotenv import load_dotenv
+    # Load environment variables from .env file (for local development)
+    load_dotenv()
+except ImportError:
+    # python-dotenv not available (production environment)
+    # Environment variables should be set directly
+    pass
 
 # Configure comprehensive logging
 logging.basicConfig(
