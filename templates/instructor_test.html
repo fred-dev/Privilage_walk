@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Privilege Walk Test Mode</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 2rem;
+        }
+
+        .container {
+            max-width: 99vw;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 2rem;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .test-controls {
+            background: #e3f2fd;
+            padding: 2rem;
+            border-bottom: 4px solid #2196f3;
+        }
+
+        .test-controls h2 {
+            margin: 0 0 1.5rem 0;
+            color: #1976d2;
+            font-size: 1.8rem;
+        }
+
+        .test-buttons {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .test-btn {
+            background: #2196f3;
+            color: white;
+            border: none;
+            padding: 1rem 1.5rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .test-btn:hover {
+            background: #1976d2;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(33, 150, 243, 0.3);
+        }
+
+        .test-btn.danger {
+            background: #f44336;
+        }
+
+        .test-btn.danger:hover {
+            background: #d32f2f;
+            box-shadow: 0 4px 12px rgba(244, 67, 54, 0.3);
+        }
+
+        .test-btn.success {
+            background: #4caf50;
+        }
+
+        .test-btn.success:hover {
+            background: #388e3c;
+            box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
+        }
+
+        .test-btn.warning {
+            background: #ff9800;
+        }
+
+        .test-btn.warning:hover {
+            background: #f57c00;
+            box-shadow: 0 4px 12px rgba(255, 152, 0, 0.3);
+        }
+
+        .privilege-walk-view {
+            display: block;
+            max-width: 99vw;
+            margin: 0 auto;
+            background: white;
+            padding: 2rem;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        .walk-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            padding-bottom: 1rem;
+            border-bottom: 2px solid #eee;
+        }
+
+        .walk-header h2 {
+            color: #333;
+            font-size: 2rem;
+        }
+
+        .back-btn {
+            background: #6c757d;
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .back-btn:hover {
+            background: #5a6268;
+        }
+
+        .walk-container {
+            position: relative;
+            width: 100%;
+            height: 600px;
+            background: #f8f9fa;
+            border: 2px solid #dee2e6;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .walk-grid {
+            position: absolute;
+            top: 8px;
+            left: 8px;
+            right: 8px;
+            bottom: 8px;
+            display: grid;
+            gap: 1px;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .grid-cell {
+            background: rgba(255, 255, 255, 0.1);
+            border-right: 1px solid #000000;
+            border-bottom: 1px solid #000000;
+        }
+
+        .grid-label-cell {
+            background: rgba(255, 255, 255, 0.2);
+            border-right: 1px solid #000000;
+            border-bottom: 1px solid #000000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            color: #333;
+            font-size: 0.9rem;
+        }
+
+        .user-marker {
+            position: absolute;
+            background: #667eea;
+            color: white;
+            padding: 0.25rem 0.5rem;
+            border-radius: 8px;
+            font-weight: 600;
+            text-align: center;
+            min-width: 60px;
+            max-width: 80px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+            transition: all 0.5s ease;
+            font-size: 0.75rem;
+            z-index: 3;
+            transform: translate(-50%, -50%);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .user-marker.answered {
+            background: #28a745;
+        }
+
+        .user-marker.pending {
+            background: #ffc107;
+            color: #333;
+        }
+
+        .question-display {
+            background: #f8f9fa;
+            padding: 1.5rem;
+            border-radius: 10px;
+            margin-bottom: 2rem;
+            border-left: 4px solid #667eea;
+        }
+
+        .question-text {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 0.5rem;
+        }
+
+        .question-progress {
+            color: #666;
+            font-size: 1rem;
+        }
+
+        .status-info {
+            background: #e8f5e8;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            border-left: 4px solid #28a745;
+        }
+
+        .status-info h3 {
+            color: #28a745;
+            margin-bottom: 0.5rem;
+        }
+
+        .status-info p {
+            color: #333;
+            margin-bottom: 0.25rem;
+        }
+
+        .user-list {
+            background: #f8f9fa;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-top: 1rem;
+        }
+
+        .user-list h3 {
+            color: #333;
+            margin-bottom: 0.5rem;
+        }
+
+        .user-item {
+            display: inline-block;
+            background: #667eea;
+            color: white;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            margin: 0.25rem;
+            font-size: 0.8rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🧪 Privilege Walk Test Mode</h1>
+            <p>Test the system with multiple simulated users</p>
+        </div>
+
+        <div class="test-controls">
+            <h2>Test Controls</h2>
+            <div class="test-buttons">
+                <button onclick="generateTestUsers(40)" class="test-btn">Generate 40 Test Users</button>
+                <button onclick="generateTestUsers(20)" class="test-btn">Generate 20 Test Users</button>
+                <button onclick="generateTestUsers(12)" class="test-btn">Generate 12 Test Users</button>
+                <button onclick="setAllScoresToZero()" class="test-btn success">Set All Scores to 0</button>
+                <button onclick="setRandomScores()" class="test-btn warning">Set Random Scores (-12 to +12)</button>
+                <button onclick="clearTestUsers()" class="test-btn danger">Clear Test Users</button>
+            </div>
+        </div>
+
+        <div class="privilege-walk-view" id="privilegeWalkView">
+            <div class="walk-header">
+                <h2>🚶‍♂️ Privilege Walk Grid</h2>
+                <a href="/" class="back-btn">← Back to Home</a>
+            </div>
+
+            <div class="status-info" id="statusInfo">
+                <h3>Status</h3>
+                <p>No test users generated yet. Use the controls above to generate test users.</p>
+            </div>
+
+            <div class="question-display" id="questionDisplay">
+                <div class="question-text" id="questionText">Test Mode - No Active Question</div>
+                <div class="question-progress" id="questionProgress">Ready for testing</div>
+            </div>
+
+            <div class="walk-container" id="walkContainer">
+                <div class="walk-grid" id="walkGrid"></div>
+            </div>
+
+            <div class="user-list" id="userList">
+                <h3>Test Users</h3>
+                <div id="userItems">No users yet</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let users = [];
+        let userCount = 0;
+        let userPositions = {};
+        let userAnswers = {};
+        let lastKnownPositions = {};
+
+        // Generate random 7-character usernames
+        function generateRandomUsername() {
+            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+            let result = '';
+            for (let i = 0; i < 7; i++) {
+                result += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            return result;
+        }
+
+        // Generate test users
+        function generateTestUsers(count) {
+            console.log(`Generating ${count} test users...`);
+            
+            // Generate unique usernames
+            const testUsers = [];
+            const usedNames = new Set();
+            
+            while (testUsers.length < count) {
+                const username = generateRandomUsername();
+                if (!usedNames.has(username)) {
+                    usedNames.add(username);
+                    testUsers.push(username);
+                }
+            }
+            
+            // Update global variables
+            users = testUsers;
+            userCount = testUsers.length;
+            
+            // Initialize user answers and positions
+            userAnswers = {};
+            userPositions = {};
+            testUsers.forEach(username => {
+                userAnswers[username] = false;
+                userPositions[username] = 0;
+            });
+            
+            // Update display
+            updateStatusInfo();
+            updateUserList();
+            
+            // Create grid and markers
+            createGrid();
+            createUserMarkers();
+            
+            // Update marker positions with initial scores
+            updateUserPositions(userPositions);
+            
+            console.log(`Generated ${count} test users:`, testUsers);
+        }
+
+        // Set all scores to zero
+        function setAllScoresToZero() {
+            console.log('Setting all scores to zero...');
+            
+            const userArray = Array.isArray(users) ? users : Object.keys(users);
+            const zeroPositions = {};
+            
+            userArray.forEach(username => {
+                zeroPositions[username] = 0;
+            });
+            
+            // Update positions
+            updateUserPositions(zeroPositions);
+            
+            console.log('All scores set to zero');
+        }
+
+        // Set random scores between -12 and +12
+        function setRandomScores() {
+            console.log('Setting random scores...');
+            
+            const userArray = Array.isArray(users) ? users : Object.keys(users);
+            const randomPositions = {};
+            
+            userArray.forEach(username => {
+                randomPositions[username] = Math.floor(Math.random() * 25) - 12; // -12 to +12
+            });
+            
+            // Update positions
+            updateUserPositions(randomPositions);
+            
+            console.log('Random scores set:', randomPositions);
+        }
+
+        // Clear test users
+        function clearTestUsers() {
+            console.log('Clearing test users...');
+            
+            users = [];
+            userCount = 0;
+            userAnswers = {};
+            userPositions = {};
+            
+            // Update display
+            updateStatusInfo();
+            updateUserList();
+            
+            // Clear grid
+            const walkGrid = document.getElementById('walkGrid');
+            if (walkGrid) {
+                walkGrid.innerHTML = '';
+            }
+            
+            // Clear markers
+            const container = document.getElementById('walkContainer');
+            if (container) {
+                const markers = container.querySelectorAll('.user-marker');
+                markers.forEach(marker => marker.remove());
+            }
+            
+            console.log('Test users cleared');
+        }
+
+        // Update user positions
+        function updateUserPositions(positions) {
+            console.log('Updating user positions:', positions);
+            
+            // Update last known positions
+            lastKnownPositions = { ...positions };
+            userPositions = { ...positions };
+            
+            // Update marker positions
+            const userArray = Array.isArray(users) ? users : Object.keys(users);
+            const walkContainer = document.getElementById('walkContainer');
+            
+            if (walkContainer) {
+                const containerWidth = walkContainer.offsetWidth;
+                const containerHeight = walkContainer.offsetHeight;
+                
+                userArray.forEach((username, index) => {
+                    const marker = document.getElementById(`marker-${username}`);
+                    if (marker && positions[username] !== undefined) {
+                        const userCount = userArray.length;
+                        const labelColumnWidth = 80;
+                        const dataColumnWidth = (containerWidth - labelColumnWidth) / userCount;
+                        
+                        // Calculate horizontal position (column center)
+                        const leftPosition = labelColumnWidth + (index + 0.5) * dataColumnWidth;
+                        
+                        // Calculate vertical position based on score
+                        const score = positions[username];
+                        const totalQuestions = 12;
+                        const maxScore = totalQuestions;
+                        const minScore = -totalQuestions;
+                        const totalRows = (2 * totalQuestions) + 1;
+                        
+                        // Convert score to row index and position (positive at top, negative at bottom)
+                        const rowIndex = maxScore - score;
+                        const topPosition = ((rowIndex + 0.5) / totalRows) * 100;
+                        
+                        // Apply positions
+                        marker.style.left = `${leftPosition}px`;
+                        marker.style.top = `${topPosition}%`;
+                        
+                        console.log(`Updated ${username}: score=${score}, left=${leftPosition}px, top=${topPosition}%`);
+                    }
+                });
+            }
+        }
+
+        // Create grid function
+        function createGrid() {
+            console.log('Creating grid...');
+            
+            const walkContainer = document.getElementById('walkContainer');
+            const walkGrid = document.getElementById('walkGrid');
+            
+            if (!walkContainer || !walkGrid) {
+                console.error('Walk container or grid not found');
+                return;
+            }
+            
+            // Clear existing grid
+            walkGrid.innerHTML = '';
+            
+            // Get user array
+            const userArray = Array.isArray(users) ? users : Object.keys(users);
+            const userCount = userArray.length;
+            
+            if (userCount === 0) {
+                console.log('No users, skipping grid creation');
+                return;
+            }
+            
+            // Calculate grid dimensions
+            const totalQuestions = 12;
+            const maxScore = totalQuestions;
+            const minScore = -totalQuestions;
+            const totalRows = (2 * totalQuestions) + 1;
+            const totalColumns = userCount + 1; // +1 for label column
+            
+            console.log(`Creating grid: ${totalRows} rows, ${totalColumns} columns`);
+            
+            // Set grid template
+            walkGrid.style.gridTemplateRows = `repeat(${totalRows}, 1fr)`;
+            walkGrid.style.gridTemplateColumns = `80px repeat(${userCount}, 1fr)`;
+            
+            // Create grid cells
+            for (let row = 0; row < totalRows; row++) {
+                // Create label cell
+                const score = maxScore - row; // From maxScore to minScore (top to bottom)
+                const labelCell = document.createElement('div');
+                labelCell.className = 'grid-label-cell';
+                labelCell.textContent = score;
+                walkGrid.appendChild(labelCell);
+                
+                // Create data cells
+                for (let col = 0; col < userCount; col++) {
+                    const dataCell = document.createElement('div');
+                    dataCell.className = 'grid-cell';
+                    walkGrid.appendChild(dataCell);
+                }
+            }
+            
+            console.log('Grid creation complete');
+        }
+
+        // Create user markers
+        function createUserMarkers() {
+            const container = document.getElementById('walkContainer');
+            
+            console.log('=== MARKER CREATION START ===');
+            console.log('Current users:', users);
+            
+            // Clear existing markers
+            const existingMarkers = container.querySelectorAll('.user-marker');
+            console.log(`Found ${existingMarkers.length} existing markers, removing them...`);
+            existingMarkers.forEach(marker => {
+                console.log('Removing marker:', marker.textContent);
+                marker.remove();
+            });
+            
+            // Ensure users is an array
+            const userArray = Array.isArray(users) ? users : Object.keys(users);
+            const userCount = userArray.length;
+            
+            if (userCount === 0) {
+                console.log('No users to create markers for');
+                return;
+            }
+            
+            console.log(`Creating ${userCount} markers for users:`, userArray);
+            
+            // Create markers for each user
+            userArray.forEach((username, index) => {
+                const marker = document.createElement('div');
+                marker.className = 'user-marker';
+                marker.id = `marker-${username}`;
+                marker.textContent = username;
+                
+                // Set initial position (will be updated by updateUserPositions)
+                marker.style.left = '50%';
+                marker.style.top = '50%';
+                
+                const hasAnswered = userAnswers[username] || false;
+                marker.classList.toggle('answered', hasAnswered);
+                marker.classList.toggle('pending', !hasAnswered);
+                
+                container.appendChild(marker);
+                console.log(`Created marker for ${username}`);
+            });
+            
+            console.log('=== MARKER CREATION COMPLETE ===');
+        }
+
+        // Update status info
+        function updateStatusInfo() {
+            const statusInfo = document.getElementById('statusInfo');
+            const userArray = Array.isArray(users) ? users : Object.keys(users);
+            
+            if (userArray.length === 0) {
+                statusInfo.innerHTML = `
+                    <h3>Status</h3>
+                    <p>No test users generated yet. Use the controls above to generate test users.</p>
+                `;
+            } else {
+                statusInfo.innerHTML = `
+                    <h3>Status</h3>
+                    <p><strong>${userArray.length}</strong> test users active</p>
+                    <p>Grid size: ${userArray.length} columns × 25 rows</p>
+                    <p>Score range: -12 to +12</p>
+                `;
+            }
+        }
+
+        // Update user list
+        function updateUserList() {
+            const userItems = document.getElementById('userItems');
+            const userArray = Array.isArray(users) ? users : Object.keys(users);
+            
+            if (userArray.length === 0) {
+                userItems.textContent = 'No users yet';
+            } else {
+                userItems.innerHTML = userArray.map(username => 
+                    `<span class="user-item">${username}</span>`
+                ).join('');
+            }
+        }
+
+        // Initialize page
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('Test page loaded');
+            updateStatusInfo();
+            updateUserList();
+        });
+    </script>
+</body>
+</html>

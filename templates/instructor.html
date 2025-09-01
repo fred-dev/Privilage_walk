@@ -323,13 +323,15 @@
         
         .privilege-walk-view {
             display: none;
-            max-width: 1200px;
+            max-width: 99vw;
             margin: 0 auto;
             background: white;
             padding: 2rem;
             border-radius: 15px;
             box-shadow: 0 5px 15px rgba(0,0,0,0.1);
         }
+        
+
         
         .walk-header {
             display: flex;
@@ -382,10 +384,10 @@
         
         .walk-grid {
             position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
+            top: 8px;
+            left: 8px;
+            right: 8px;
+            bottom: 8px;
             display: grid;
             /* Grid rows and columns will be set dynamically via JavaScript */
             gap: 1px;
@@ -394,13 +396,16 @@
         }
         
         .grid-cell {
-            background: rgba(255, 255, 255, 0.1);
-            border: 1px solid rgba(255, 255, 255, 0.2);
+            background: rgba(255, 255, 255, 0.15);
+            border-right: 1px solid #000000;
+            border-bottom: 1px solid #000000;
+            box-sizing: border-box;
         }
         
         .grid-label-cell {
             background: rgba(255, 255, 255, 0.9);
-            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-right: 1px solid #000000;
+            border-bottom: 1px solid #000000;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -408,6 +413,7 @@
             font-weight: 600;
             color: #666;
             text-align: center;
+            box-sizing: border-box;
         }
         
 
@@ -416,16 +422,20 @@
             position: absolute;
             background: #667eea;
             color: white;
-            padding: 0.5rem 1rem;
-            border-radius: 20px;
+            padding: 0.25rem 0.5rem;
+            border-radius: 8px;
             font-weight: 600;
             text-align: center;
-            min-width: 120px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            min-width: 60px;
+            max-width: 80px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
             transition: all 0.5s ease;
-            font-size: 0.9rem;
+            font-size: 0.75rem;
             z-index: 3;
             transform: translate(-50%, -50%); /* Center the marker on the grid position */
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
         
         .user-marker.answered {
@@ -728,6 +738,8 @@
             <h2>🚶‍♂️ Privilege Walk in Progress</h2>
             <button onclick="showMainView()" class="back-btn">← Back to Setup</button>
         </div>
+        
+
         
         <div class="question-display" id="questionDisplay">
             <div class="question-text" id="questionText"></div>
@@ -1038,7 +1050,39 @@
             // Update participant display to show current answer status
             updateParticipantDisplay();
             
+            // Update marker colors based on answer status
+            updateMarkerColors();
+            
             // Only update positions when there are actual score changes, not on every status update
+        }
+        
+        function updateMarkerColors() {
+            console.log('=== UPDATING MARKER COLORS ===');
+            console.log('Current userAnswers:', userAnswers);
+            
+            // Update each user marker's color based on their answer status
+            Object.keys(userAnswers).forEach(username => {
+                const marker = document.getElementById(`marker-${username}`);
+                if (marker) {
+                    const hasAnswered = userAnswers[username] || false;
+                    
+                    // Remove existing status classes
+                    marker.classList.remove('answered', 'pending');
+                    
+                    // Add appropriate status class
+                    if (hasAnswered) {
+                        marker.classList.add('answered');
+                        console.log(`✅ ${username}: Green (answered)`);
+                    } else {
+                        marker.classList.add('pending');
+                        console.log(`⏳ ${username}: Orange (pending)`);
+                    }
+                } else {
+                    console.warn(`Marker not found for user: ${username}`);
+                }
+            });
+            
+            console.log('=== MARKER COLORS UPDATED ===');
             // This prevents the flashing effect during regular polling
             // Positions will be updated separately when scores actually change
         }
@@ -1253,88 +1297,73 @@
                 return;
             }
             
-            // Get current positions first to position markers correctly from the start
-            try {
-                const response = await fetch(`/api/positions/${sessionId}`);
-                if (response.ok) {
-                    const data = await response.json();
-                    const positions = data.positions || {};
-                    
-                    // Create markers positioned correctly from the start
-                    userArray.forEach((username, index) => {
-                        const marker = document.createElement('div');
-                        marker.className = 'user-marker';
-                        marker.id = `marker-${username}`;
-                        marker.textContent = username;
-                        
-                        // Position marker based on current score (avoid the "jump" effect)
-                        if (positions[username] !== undefined) {
-                            const walkContainer = document.getElementById('walkContainer');
-                            const containerWidth = walkContainer.offsetWidth;
-                            const columnWidth = containerWidth / userCount;
-                            
-                            // Calculate horizontal position (column center)
-                            const leftPosition = (index + 0.5) * columnWidth;
-                            
-                            // Calculate vertical position based on score
-                            const score = positions[username];
-                            const totalQuestions = window.totalQuestions || 12; // Fallback to 12 if not set
-                            const maxScore = totalQuestions;
-                            const minScore = -totalQuestions;
-                            const totalRows = (2 * totalQuestions) + 1;
-                            const topPosition = ((maxScore - score) / (totalRows - 1)) * 100; // Flip: minScore = 100%, maxScore = 0%
-                            
-                            console.log(`Positioning ${username}: column ${index}, left=${leftPosition}px, score=${score}, top=${topPosition}%`);
-                            
-                            marker.style.left = `${leftPosition}px`;
-                            marker.style.top = `${topPosition}%`;
-                        } else {
-                            // Fallback to center if no position data yet
-                            marker.style.left = '50%';
-                            marker.style.top = '50%';
-                        }
-                        
-                        // Set initial answer status
-                        const hasAnswered = userAnswers[username] || false;
-                        marker.classList.add(hasAnswered ? 'answered' : 'pending');
-                        
-                        container.appendChild(marker);
-                    });
-                } else {
-                    // Fallback: create markers at center if position fetch fails
-                    userArray.forEach((username, index) => {
-                        const marker = document.createElement('div');
-                        marker.className = 'user-marker';
-                        marker.id = `marker-${username}`;
-                        marker.textContent = username;
-                        
-                        marker.style.left = '50%';
-                        marker.style.top = '50%';
-                        
-                        const hasAnswered = userAnswers[username] || false;
-                        marker.classList.add(hasAnswered ? 'answered' : 'pending');
-                        
-                        container.appendChild(marker);
-                    });
+            // Check if we're in test mode (test users are arrays, real users are objects)
+            const isTestMode = Array.isArray(users);
+            
+            let positions = {};
+            
+            if (isTestMode) {
+                // Use last known positions for test users
+                positions = lastKnownPositions || {};
+                console.log('Test mode detected, using last known positions:', positions);
+            } else {
+                // Get current positions from server for real users
+                try {
+                    const response = await fetch(`/api/positions/${sessionId}`);
+                    if (response.ok) {
+                        const data = await response.json();
+                        positions = data.positions || {};
+                    }
+                } catch (error) {
+                    console.error('Failed to fetch positions:', error);
                 }
-            } catch (error) {
-                console.error('Error loading positions for marker creation:', error);
-                // Fallback: create markers at center
-                userArray.forEach((username, index) => {
-                    const marker = document.createElement('div');
-                    marker.className = 'user-marker';
-                    marker.id = `marker-${username}`;
-                    marker.textContent = username;
+            }
+            
+            // Create markers positioned correctly from the start
+            userArray.forEach((username, index) => {
+                const marker = document.createElement('div');
+                marker.className = 'user-marker';
+                marker.id = `marker-${username}`;
+                marker.textContent = username;
+                
+                // Position marker based on current score
+                if (positions[username] !== undefined) {
+                    const walkContainer = document.getElementById('walkContainer');
+                    const containerWidth = walkContainer.offsetWidth;
                     
+                    // Calculate horizontal position (column center)
+                    const labelColumnWidth = 80;
+                    const dataColumnWidth = (containerWidth - labelColumnWidth) / userCount;
+                    const leftPosition = labelColumnWidth + (index + 0.5) * dataColumnWidth;
+                    
+                    // Calculate vertical position based on score
+                    const score = positions[username];
+                    const totalQuestions = window.totalQuestions || 12;
+                    const maxScore = totalQuestions;
+                    const minScore = -totalQuestions;
+                    const totalRows = (2 * totalQuestions) + 1;
+                    const rowIndex = maxScore - score;
+                    const topPosition = ((rowIndex + 0.5) / totalRows) * 100;
+                    
+                    console.log(`Positioning ${username}: column ${index}, left=${leftPosition}px, score=${score}, top=${topPosition}%`);
+                    
+                    marker.style.left = `${leftPosition}px`;
+                    marker.style.top = `${topPosition}%`;
+                } else {
+                    // Fallback to center if no position data yet
                     marker.style.left = '50%';
                     marker.style.top = '50%';
-                    
-                    const hasAnswered = userAnswers[username] || false;
-                    marker.classList.add(hasAnswered ? 'answered' : 'pending');
-                    
-                    container.appendChild(marker);
-                });
-            }
+                }
+                
+                // Set initial answer status
+                const hasAnswered = userAnswers[username] || false;
+                marker.classList.add(hasAnswered ? 'answered' : 'pending');
+                
+                container.appendChild(marker);
+            });
+            
+            // Update marker colors after creating all markers
+            updateMarkerColors();
         }
         
         function createWalkGrid() {
@@ -1382,7 +1411,8 @@
                 // First column: labels
                 const labelCell = document.createElement('div');
                 labelCell.className = 'grid-label-cell';
-                const score = minScore + row; // From minScore to maxScore
+                // Fix the order: maxScore at top (row 0), minScore at bottom (last row)
+                const score = maxScore - row; // From maxScore to minScore (top to bottom)
                 labelCell.textContent = score;
                 walkGrid.appendChild(labelCell);
                 
@@ -1403,6 +1433,7 @@
             console.log(`Final grid: ${totalRows} rows, ${userArray.length + 1} columns (1 label + ${userArray.length} data)`);
             console.log(`Label cells created: ${walkContainer.querySelectorAll('.grid-label-cell').length}`);
             console.log(`Data cells created: ${walkContainer.querySelectorAll('.grid-cell').length}`);
+            
         }
 
         function updateUserPositions(positions) {
@@ -1411,6 +1442,7 @@
             const walkContainer = document.getElementById('walkContainer');
             const containerWidth = walkContainer.offsetWidth;
             const containerHeight = walkContainer.offsetHeight;
+            
             
             // Ensure users is an array
             const userArray = Array.isArray(users) ? users : Object.keys(users);
@@ -1436,14 +1468,14 @@
                     
                     // Calculate vertical position based on score
                     // Score ranges from -totalQuestions to +totalQuestions, convert to 0-100%
-                    // minScore should be at bottom (100%), maxScore should be at top (0%)
+                    // maxScore should be at top (0%), minScore should be at bottom (100%)
                     const score = positions[username];
                     const totalQuestions = window.totalQuestions || 12; // Fallback to 12 if not set
                     const maxScore = totalQuestions;
                     const minScore = -totalQuestions;
                     const totalRows = (2 * totalQuestions) + 1;
-                    // Convert score to row index: score - minScore
-                    const rowIndex = score - minScore;
+                    // Convert score to row index: maxScore - score (since grid is now maxScore at top)
+                    const rowIndex = maxScore - score;
                     // Position at the center of the corresponding row
                     const topPosition = ((rowIndex + 0.5) / totalRows) * 100;
                     
@@ -1785,6 +1817,70 @@
             
             // No real changes that require position updates
             return false;
+        }
+        
+
+        
+        // Create grid function
+        function createGrid() {
+            console.log('Creating grid...');
+            
+            const walkContainer = document.getElementById('walkContainer');
+            const walkGrid = document.getElementById('walkGrid');
+            
+            if (!walkContainer || !walkGrid) {
+                console.error('Walk container or grid not found');
+                return;
+            }
+            
+            // Clear existing grid
+            walkGrid.innerHTML = '';
+            
+            // Get user array
+            const userArray = Array.isArray(users) ? users : Object.keys(users);
+            const userCount = userArray.length;
+            
+            if (userCount === 0) {
+                console.log('No users, skipping grid creation');
+                return;
+            }
+            
+            // Calculate grid dimensions
+            const totalQuestions = window.totalQuestions || 12;
+            const maxScore = totalQuestions;
+            const minScore = -totalQuestions;
+            const totalRows = (2 * totalQuestions) + 1;
+            
+            console.log(`Creating grid: ${totalRows} rows, ${userCount + 1} columns (1 label + ${userCount} data)`);
+            
+            // Set the CSS grid template rows and columns dynamically
+            walkGrid.style.gridTemplateRows = `repeat(${totalRows}, 1fr)`;
+            walkGrid.style.gridTemplateColumns = `80px repeat(${userCount}, 1fr)`;
+            
+            // Create grid cells including label column
+            for (let row = 0; row < totalRows; row++) {
+                // First column: labels
+                const labelCell = document.createElement('div');
+                labelCell.className = 'grid-label-cell';
+                // Fix the order: maxScore at top (row 0), minScore at bottom (last row)
+                const score = maxScore - row; // From maxScore to minScore (top to bottom)
+                labelCell.textContent = score;
+                walkGrid.appendChild(labelCell);
+                
+                // Remaining columns: data cells
+                for (let col = 0; col < userCount; col++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'grid-cell';
+                    walkGrid.appendChild(cell);
+                }
+            }
+            
+            // Mark grid as created
+            gridCreated = true;
+            console.log('=== GRID CREATION COMPLETE ===');
+            console.log(`Final grid: ${totalRows} rows, ${userCount + 1} columns (1 label + ${userCount} data)`);
+            console.log(`Label cells created: ${walkContainer.querySelectorAll('.grid-label-cell').length}`);
+            console.log(`Data cells created: ${walkContainer.querySelectorAll('.grid-cell').length}`);
         }
         
         // Start polling when page loads

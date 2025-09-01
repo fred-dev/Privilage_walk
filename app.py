@@ -187,6 +187,31 @@ def instructor_view(session_id):
                          session_name="Privilege Walk Session",
                          base_url=base_url)
 
+@app.route('/instructor/test')
+def instructor_test():
+    """Test page for instructor to test with multiple users"""
+    # Get the same network IP that the QR code uses
+    base_url = None
+    is_local_testing = os.environ.get('LOCAL_TESTING', 'false').lower() == 'true'
+    
+    if is_local_testing:
+        try:
+            import socket
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.connect(("8.8.8.8", 80))
+            local_ip = s.getsockname()[0]
+            s.close()
+            base_url = f'http://{local_ip}:5001'
+        except Exception as e:
+            logger.warning(f"Could not detect local IP, falling back to localhost: {e}")
+            base_url = 'http://127.0.0.1:5001'
+    else:
+        base_url = 'https://privilage-walk.onrender.com'
+    
+    return render_template('instructor_test.html', 
+                         session_name="Privilege Walk Test Mode",
+                         base_url=base_url)
+
 @app.route('/join/<session_id>')
 def student_join(session_id):
     """Student join page"""
