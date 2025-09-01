@@ -398,16 +398,16 @@
             border: 1px solid rgba(255, 255, 255, 0.2);
         }
         
-        .grid-row-label {
-            position: absolute;
-            left: 10px;
+        .grid-label-cell {
             background: rgba(255, 255, 255, 0.9);
-            padding: 0.25rem 0.5rem;
-            border-radius: 4px;
-            font-size: 0.7rem;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8rem;
             font-weight: 600;
             color: #666;
-            z-index: 2;
+            text-align: center;
         }
         
 
@@ -872,18 +872,12 @@
                             const questionData = await questionResponse.json();
                             questionText = questionData.question;
                             
-                            // Update left panel question display
-                            const questionDisplay = document.getElementById('questionDisplay');
-                            if (questionDisplay) {
-                                questionDisplay.textContent = questionText;
-                            }
+                            // Update question display using the proper function
+                            updateQuestionDisplay(questionText, currentQuestion + 1, totalQuestions);
                         }
                     } else {
                         // No more questions, clear the display
-                        const questionDisplay = document.getElementById('questionDisplay');
-                        if (questionDisplay) {
-                            questionDisplay.textContent = 'Session completed - no more questions';
-                        }
+                        updateQuestionDisplay('Session completed - no more questions', totalQuestions, totalQuestions);
                     }
                     
                     // Update question progress
@@ -1379,28 +1373,25 @@
             });
             
             // Set the CSS grid template rows and columns dynamically
+            // Add one extra column for labels (first column)
             walkGrid.style.gridTemplateRows = `repeat(${totalRows}, 1fr)`;
-            walkGrid.style.gridTemplateColumns = `repeat(${userArray.length}, 1fr)`;
+            walkGrid.style.gridTemplateColumns = `80px repeat(${userArray.length}, 1fr)`;
             
-            // Create grid cells
+            // Create grid cells including label column
             for (let row = 0; row < totalRows; row++) {
+                // First column: labels
+                const labelCell = document.createElement('div');
+                labelCell.className = 'grid-label-cell';
+                const score = minScore + row; // From minScore to maxScore
+                labelCell.textContent = score;
+                walkGrid.appendChild(labelCell);
+                
+                // Remaining columns: data cells
                 for (let col = 0; col < userArray.length; col++) {
                     const cell = document.createElement('div');
                     cell.className = 'grid-cell';
                     walkGrid.appendChild(cell);
                 }
-            }
-            
-            // Add row labels (scores) - ensure we go from minScore to maxScore
-            for (let row = 0; row < totalRows; row++) {
-                const score = minScore + row; // From minScore to maxScore
-                const label = document.createElement('div');
-                label.className = 'grid-row-label';
-                label.textContent = score;
-                // Flip the positioning: minScore at bottom, maxScore at top
-                label.style.top = `${((totalRows - 1 - row) / (totalRows - 1)) * 100}%`;
-                walkContainer.appendChild(label);
-                console.log(`Created row label: ${score} at position ${((totalRows - 1 - row) / (totalRows - 1)) * 100}%`);
             }
             
             // Column labels removed - user markers already show usernames and move with scores
@@ -1409,9 +1400,9 @@
             // Mark grid as created
             gridCreated = true;
             console.log('=== GRID CREATION COMPLETE ===');
-            console.log(`Final grid: ${totalRows} rows, ${userArray.length} columns`);
-            console.log(`Row labels created: ${walkContainer.querySelectorAll('.grid-row-label').length}`);
-            console.log(`Column labels created: ${walkContainer.querySelectorAll('.grid-column-label').length}`);
+            console.log(`Final grid: ${totalRows} rows, ${userArray.length + 1} columns (1 label + ${userArray.length} data)`);
+            console.log(`Label cells created: ${walkContainer.querySelectorAll('.grid-label-cell').length}`);
+            console.log(`Data cells created: ${walkContainer.querySelectorAll('.grid-cell').length}`);
         }
 
         function updateUserPositions(positions) {
@@ -1436,8 +1427,12 @@
                     const userIndex = userArray.indexOf(username);
                     if (userIndex === -1) return;
                     
+                    
                     // Calculate horizontal position (column center)
-                    const leftPosition = (userIndex + 0.5) * columnWidth;
+                    // Account for the label column (80px) and the user's column position
+                    const labelColumnWidth = 80;
+                    const dataColumnWidth = (containerWidth - labelColumnWidth) / userCount;
+                    const leftPosition = labelColumnWidth + (userIndex + 0.5) * dataColumnWidth;
                     
                     // Calculate vertical position based on score
                     // Score ranges from -totalQuestions to +totalQuestions, convert to 0-100%
@@ -1447,7 +1442,10 @@
                     const maxScore = totalQuestions;
                     const minScore = -totalQuestions;
                     const totalRows = (2 * totalQuestions) + 1;
-                    const topPosition = ((maxScore - score) / (totalRows - 1)) * 100; // Flip: minScore = 100%, maxScore = 0%
+                    // Convert score to row index: score - minScore
+                    const rowIndex = score - minScore;
+                    // Position at the center of the corresponding row
+                    const topPosition = ((rowIndex + 0.5) / totalRows) * 100;
                     
                     // Position marker on the grid
                     marker.style.left = `${leftPosition}px`;
