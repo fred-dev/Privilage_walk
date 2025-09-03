@@ -651,6 +651,65 @@
         .participant-pending {
             border-left-color: #ffc107;
         }
+        
+        .question-progress-control-bar {
+            background: #f8f9fa;
+            border: 2px solid #667eea;
+            border-radius: 10px;
+            padding: 1rem;
+            margin: 1rem 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .question-info {
+            flex: 1;
+            margin-right: 1rem;
+        }
+        
+        .question-text-display {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 0.5rem;
+        }
+        
+        .question-stats {
+            font-size: 0.9rem;
+            color: #666;
+        }
+        
+        .question-controls {
+            display: flex;
+            gap: 0.5rem;
+        }
+        
+        .question-nav-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            min-width: 120px;
+        }
+        
+        .question-nav-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+        }
+        
+        .question-nav-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
     </style>
 </head>
 <body>
@@ -672,7 +731,7 @@
                     <ol>
                         <li>📱 Scan this QR code with your phone camera</li>
                         <li>🌐 You'll be taken to a join page</li>
-                        <li>✏️ Enter a nickname (can be fake)</li>
+                        <li>✏️ Enter a unique nickname (at least 2 characters)</li>
                         <li>⏳ You'll see "Please wait" until the session starts</li>
                     </ol>
                 </div>
@@ -711,14 +770,7 @@
                 </div>
                 <button onclick="manualRefresh()" style="margin-top: 0.5rem; padding: 0.5rem 1rem; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer;">🔄 Refresh List</button>
             </div>
-            <div class="question-progress-display" id="questionProgressDisplay" style="display: none;">
-                <h3>📝 Question Progress</h3>
-                <div class="current-question" id="currentQuestionDisplay"></div>
-                <div class="answered-status" id="answeredStatusDisplay"></div>
-                <button class="next-question-btn" id="nextQuestionBtn" style="display: none;" onclick="advanceToNextQuestion()">
-                    ➡️ Next Question
-                </button>
-            </div>
+
             <div class="user-list" id="userList">
                 <p style="text-align: center; color: #666;">No participants have joined yet</p>
             </div>
@@ -751,6 +803,22 @@
                 <!-- Grid will be generated dynamically -->
             </div>
             <!-- User markers will be dynamically added here -->
+        </div>
+        
+        <!-- Question Progress Control Bar -->
+        <div class="question-progress-control-bar" id="questionProgressControlBar" style="display: none;">
+            <div class="question-info">
+                <div class="question-text-display" id="questionTextDisplay"></div>
+                <div class="question-stats" id="questionStats"></div>
+            </div>
+            <div class="question-controls">
+                <button class="question-nav-btn" id="prevQuestionBtn" style="display: none;" onclick="goToPreviousQuestion()">
+                    ⬅️ Previous
+                </button>
+                <button class="question-nav-btn" id="nextQuestionBtn" style="display: none;" onclick="advanceToNextQuestion()">
+                    ➡️ Next
+                </button>
+            </div>
         </div>
     </div>
     
@@ -1088,24 +1156,22 @@
         }
 
         function updateQuestionProgress() {
-            const questionProgressDisplay = document.getElementById('questionProgressDisplay');
-            const currentQuestionDisplay = document.getElementById('currentQuestionDisplay');
-            const answeredStatusDisplay = document.getElementById('answeredStatusDisplay');
+            const questionProgressControlBar = document.getElementById('questionProgressControlBar');
+            const questionTextDisplay = document.getElementById('questionTextDisplay');
+            const questionStats = document.getElementById('questionStats');
             const nextQuestionBtn = document.getElementById('nextQuestionBtn');
+            const prevQuestionBtn = document.getElementById('prevQuestionBtn');
             
-            if (questionProgressDisplay && currentQuestionDisplay && answeredStatusDisplay) {
-                questionProgressDisplay.style.display = 'block';
-                currentQuestionDisplay.textContent = `Question ${currentQuestion + 1} of ${totalQuestions}: ${questionText}`;
+            if (questionProgressControlBar && questionTextDisplay && questionStats) {
+                questionProgressControlBar.style.display = 'flex';
+                questionTextDisplay.textContent = `Question ${currentQuestion + 1} of ${totalQuestions}: ${questionText}`;
                 
                 // Count answered vs pending users
                 const answeredCount = Object.values(userAnswers).filter(answered => answered).length;
                 const totalUsers = Object.keys(users).length;
                 const pendingCount = totalUsers - answeredCount;
                 
-                answeredStatusDisplay.innerHTML = `
-                    <div>✅ Answered: ${answeredCount}/${totalUsers}</div>
-                    <div>⏳ Pending: ${pendingCount}/${totalUsers}</div>
-                `;
+                let statsText = `✅ Answered: ${answeredCount}/${totalUsers} | ⏳ Pending: ${pendingCount}/${totalUsers}`;
                 
                 // Update user list to reflect current answer status
                 updateUserList();
@@ -1113,23 +1179,40 @@
                 // Update participant display to show current answer status
                 updateParticipantDisplay();
 
-                // Check if all users have answered the current question
-                if (answeredCount === totalUsers && totalUsers > 0) {
-                    questionProgressDisplay.classList.add('all-answered');
-                    answeredStatusDisplay.innerHTML += `
-                        <div style="margin-top: 0.5rem; font-weight: 600; color: #155724;">
-                            🎉 All users have answered! Ready for next question.
-                        </div>
-                    `;
-                    nextQuestionBtn.style.display = 'block'; // Show next question button
-                    
-                    // All users answered - this triggers score changes, so update positions
-                    console.log('All users answered - updating positions due to score changes');
-                    loadUserPositions();
+                // Show/hide previous question button
+                if (currentQuestion > 0) {
+                    prevQuestionBtn.style.display = 'block';
                 } else {
-                    questionProgressDisplay.classList.remove('all-answered');
-                    nextQuestionBtn.style.display = 'none'; // Hide next question button
+                    prevQuestionBtn.style.display = 'none';
                 }
+
+                // Show/hide next question button
+                if (currentQuestion < totalQuestions - 1) {
+                    // Check if all users have answered the current question
+                    if (answeredCount === totalUsers && totalUsers > 0) {
+                        statsText += ` | 🎉 All users have answered! Ready for next question.`;
+                        nextQuestionBtn.style.display = 'block';
+                        nextQuestionBtn.textContent = '➡️ Next';
+                        
+                        // All users answered - this triggers score changes, so update positions
+                        console.log('All users answered - updating positions due to score changes');
+                        loadUserPositions();
+                    } else {
+                        // Show manual override button even when not all users answered
+                        nextQuestionBtn.style.display = 'block';
+                        nextQuestionBtn.textContent = `➡️ Next (${pendingCount} pending)`;
+                        
+                        // Add warning about pending users
+                        if (pendingCount > 0) {
+                            statsText += ` | ⚠️ ${pendingCount} user(s) haven't answered yet. You can manually advance if needed.`;
+                        }
+                    }
+                } else {
+                    // Last question - hide next button
+                    nextQuestionBtn.style.display = 'none';
+                }
+                
+                questionStats.textContent = statsText;
             }
         }
 
@@ -1185,10 +1268,16 @@
             if (participantDisplay) {
                 participantDisplay.style.display = 'none';
             }
+            
+            // If session is active, show question progress and next question button
+            if (currentQuestion >= 0 && totalQuestions > 0) {
+                updateQuestionProgress();
+            }
         }
 
         async function showPrivilegeWalkView() {
-            document.querySelector('.main-content').style.display = 'none';
+            // Keep main content visible so instructor can see question progress and navigation buttons
+            document.querySelector('.main-content').style.display = 'flex';
             document.getElementById('privilegeWalkView').style.display = 'block';
             document.getElementById('finalResults').style.display = 'none';
             
@@ -1355,7 +1444,8 @@
                     marker.style.top = '50%';
                 }
                 
-                // Set initial answer status
+                // Set initial answer status - always start as pending for new questions
+                // This ensures markers are yellow when a new question starts
                 const hasAnswered = userAnswers[username] || false;
                 marker.classList.add(hasAnswered ? 'answered' : 'pending');
                 
@@ -1660,9 +1750,22 @@
                 console.log('Advance question response:', data);
                 if (data.success) {
                     console.log('✅ Question advanced successfully');
+                    
+                    // Show feedback if override was used
+                    if (data.override_used && data.unanswered_users && data.unanswered_users.length > 0) {
+                        console.log(`⚠️ Manual override used - ${data.unanswered_users.length} users were still pending:`, data.unanswered_users);
+                        // You could show a toast notification here if desired
+                    }
+                    
                     // Reload current question and progress
                     await loadCurrentQuestion();
                     updateQuestionProgress();
+                    
+                    // Reset user answers for the new question (all users start as pending)
+                    Object.keys(userAnswers).forEach(username => {
+                        userAnswers[username] = false;
+                    });
+                    
                     // Re-create user markers to update their positions
                     await createUserMarkers();
                     
@@ -1674,6 +1777,41 @@
             } catch (error) {
                 console.error('Error advancing question:', error);
                 alert('Error advancing question');
+            }
+        }
+        
+        // Function to go to previous question
+        async function goToPreviousQuestion() {
+            console.log('Previous Question Button Clicked!');
+            if (currentQuestion <= 0) {
+                alert('Already at the first question');
+                return;
+            }
+            
+            try {
+                // For now, we'll just decrement the current question locally
+                // In a full implementation, you might want to add a backend endpoint for this
+                currentQuestion = currentQuestion - 1;
+                
+                // Reload current question and progress
+                await loadCurrentQuestion();
+                updateQuestionProgress();
+                
+                // Reset user answers for the previous question (all users start as pending)
+                Object.keys(userAnswers).forEach(username => {
+                    userAnswers[username] = false;
+                });
+                
+                // Update participant display for previous question
+                updateParticipantDisplay();
+                
+                // Update marker colors for previous question
+                updateMarkerColors();
+                
+                console.log(`✅ Moved to previous question: ${currentQuestion + 1}`);
+            } catch (error) {
+                console.error('Error going to previous question:', error);
+                alert('Error going to previous question');
             }
         }
         

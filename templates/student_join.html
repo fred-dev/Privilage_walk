@@ -141,7 +141,7 @@
             <div class="form-group">
                 <label for="username">Choose a nickname:</label>
                 <input type="text" id="username" name="username" 
-                       placeholder="Enter your nickname" required>
+                       placeholder="Enter a unique nickname (at least 2 characters)" required>
             </div>
             
             <button type="submit" id="joinButton">Join Session</button>
@@ -164,8 +164,22 @@
             const loading = document.getElementById('loading');
             const errorMessage = document.getElementById('errorMessage');
             
+            // Enhanced validation for usernames
             if (!username) {
-                showError('Please enter a nickname');
+                showError('Please enter a nickname. Anonymous usernames are not allowed to prevent issues in large groups.');
+                return;
+            }
+            
+            // Prevent common anonymous/placeholder usernames
+            const anonymousPatterns = ['anonymous', 'anon', 'user', 'guest', 'test', 'temp', 'unknown', 'n/a', 'na'];
+            if (anonymousPatterns.includes(username.toLowerCase())) {
+                showError('Please choose a more specific nickname');
+                return;
+            }
+            
+            // Check for minimum length
+            if (username.length < 2) {
+                showError('Nickname must be at least 2 characters long');
                 return;
             }
             

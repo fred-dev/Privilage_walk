@@ -295,6 +295,20 @@ def api_join_session():
     if not session_id or not username:
         return jsonify({'error': 'Missing session_id or username'}), 400
     
+    # Validate username - prevent empty, whitespace-only, or anonymous usernames
+    username = username.strip()
+    if not username or len(username) == 0:
+        return jsonify({'error': 'Username cannot be empty'}), 400
+    
+    # Prevent common anonymous/placeholder usernames
+    anonymous_patterns = ['anonymous', 'anon', 'user', 'guest', 'test', 'temp', 'unknown', 'n/a', 'na', '']
+    if username.lower() in anonymous_patterns:
+        return jsonify({'error': 'Please choose a more specific nickname'}), 400
+    
+    # Check for duplicate usernames
+    if session_id in active_sessions and username in active_sessions[session_id]['users']:
+        return jsonify({'error': f'Username "{username}" is already taken. Please choose a different nickname.'}), 400
+    
     if session_id not in active_sessions:
         logger.error(f"API join attempt for non-existent session: {session_id}")
         return jsonify({'error': 'Session not found'}), 404
@@ -505,24 +519,31 @@ def advance_question(session_id):
     
     # Check if all users have answered the current question
     all_answered = True
+    unanswered_users = []
     for username, user_data in session_data['users'].items():
         if len(user_data.get('answers', [])) <= current_q:
             all_answered = False
-            break
+            unanswered_users.append(username)
     
+    # Allow manual override even if not all users have answered
+    # Log the override for tracking purposes
     if not all_answered:
-        return jsonify({'error': 'Not all users have answered the current question'}), 400
+        logger.info(f"Manual override: advancing question despite {len(unanswered_users)} unanswered users: {unanswered_users}")
+        log_session_state(session_id, "QUESTION_ADVANCED_OVERRIDE", f"Q{current_q + 1} -> Q{current_q + 2} (Override: {len(unanswered_users)} users pending)")
     
     # Advance to next question
     session_data['current_question'] = current_q + 1
     session_data['last_activity'] = datetime.now().isoformat()
     
-    log_session_state(session_id, "QUESTION_ADVANCED", f"Q{current_q + 1} -> Q{current_q + 2}")
+    if all_answered:
+        log_session_state(session_id, "QUESTION_ADVANCED", f"Q{current_q + 1} -> Q{current_q + 2}")
     
     return jsonify({
         'success': True,
         'new_question': current_q + 2,
-        'total_questions': len(questions)
+        'total_questions': len(questions),
+        'override_used': not all_answered,
+        'unanswered_users': unanswered_users if not all_answered else []
     })
 
 @app.route('/api/rankings/<session_id>')
