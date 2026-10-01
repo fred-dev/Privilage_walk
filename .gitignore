@@ -84,3 +84,11 @@ Thumbs.db
 
 # PM2 logs
 .pm2/
+
+# Python
+*.py[cod]
+*-env/
+.ipynb_checkpoints/
+
+# OS / editor
+Desktop.ini
