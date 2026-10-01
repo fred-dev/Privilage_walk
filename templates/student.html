@@ -3,496 +3,420 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Privilege Walk - Student View</title>
+    <title>Privilege Walk</title>
     <style>
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            margin: 0;
-            padding: 20px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-        }
-        
-        .container {
-            max-width: 600px;
-            margin: 0 auto;
-        }
-        
-        .header {
-            text-align: center;
-            margin-bottom: 2rem;
-        }
-        
-        .username {
-            font-size: 1.5rem;
-            color: white;
-            margin-bottom: 0.5rem;
-        }
-        
-        .session-info {
-            color: rgba(255, 255, 255, 0.8);
-            font-size: 1rem;
-        }
-        
-        .waiting-screen {
-            background: white;
-            padding: 3rem 2rem;
-            border-radius: 20px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
-            text-align: center;
-            margin-bottom: 2rem;
-        }
-        
-        .waiting-icon {
-            font-size: 4rem;
-            margin-bottom: 1rem;
-        }
-        
-        .waiting-text {
-            font-size: 1.5rem;
-            color: #333;
-            margin-bottom: 1rem;
-        }
-        
-        .waiting-subtext {
-            color: #666;
-            line-height: 1.6;
-        }
-        
-        .question-screen {
-            display: none;
-            background: white;
-            padding: 2rem;
-            border-radius: 20px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
-            margin-bottom: 2rem;
-        }
-        
-        .question-header {
-            text-align: center;
-            margin-bottom: 2rem;
-        }
-        
-        .question-number {
-            color: #667eea;
-            font-size: 1.2rem;
-            font-weight: 600;
-            margin-bottom: 0.5rem;
-        }
-        
-        .question-text {
-            font-size: 1.3rem;
-            color: #333;
-            line-height: 1.6;
-            margin-bottom: 2rem;
-        }
-        
-        .answer-buttons {
-            display: flex;
-            gap: 1rem;
-            justify-content: center;
-        }
-        
-        .answer-button {
-            flex: 1;
-            padding: 1.5rem 1rem;
-            border: none;
-            border-radius: 15px;
-            font-size: 1.1rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-        
-        .agree-button {
-            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
-            color: white;
-        }
-        
-        .agree-button:hover:not(:disabled) {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 20px rgba(40, 167, 69, 0.3);
-        }
-        
-        .disagree-button {
-            background: linear-gradient(135deg, #dc3545 0%, #fd7e14 100%);
-            color: white;
-        }
-        
-        .disagree-button:hover:not(:disabled) {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 20px rgba(220, 53, 69, 0.3);
-        }
-        
-        .answer-button:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-            transform: none;
-            box-shadow: none;
-        }
-        
-        .progress-bar {
-            width: 100%;
-            height: 8px;
-            background: #e9ecef;
-            border-radius: 4px;
-            margin: 1rem 0;
-            overflow: hidden;
-        }
-        
-        .progress-fill {
-            height: 100%;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            width: 0%;
-            transition: width 0.5s ease;
-        }
-        
-        .progress-text {
-            color: #667eea;
-            font-size: 0.9rem;
-            font-weight: 600;
-        }
-        
-        .position-indicator {
-            background: #f8f9fa;
-            padding: 1rem;
-            border-radius: 10px;
-            margin: 1rem 0;
-            text-align: center;
-            border-left: 4px solid #667eea;
-        }
-        
-        .position-value {
-            font-size: 1.2rem;
-            font-weight: 600;
-            color: #667eea;
-        }
-        
-        .ranking-display {
-            background: #e7f3ff;
-            padding: 1rem;
-            border-radius: 10px;
-            margin: 1rem 0;
-            text-align: center;
-            border-left: 4px solid #007bff;
-        }
-        
-        .ranking-value {
-            font-size: 1.5rem;
-            font-weight: 600;
-            color: #0056b3;
-        }
-        
-        .ranking-subtitle {
-            font-size: 0.9rem;
-            color: #0056b3;
-            margin-top: 0.5rem;
-        }
-        
-        .thank-you-screen {
-            display: none;
-            background: white;
-            padding: 3rem 2rem;
-            border-radius: 20px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
-            text-align: center;
-            margin-bottom: 2rem;
-        }
-        
-        .thank-you-icon {
-            font-size: 4rem;
-            margin-bottom: 1rem;
-        }
-        
-        .thank-you-text {
-            font-size: 1.5rem;
-            color: #333;
-            margin-bottom: 1rem;
-        }
-        
-        .thank-you-subtext {
-            color: #666;
-            line-height: 1.6;
-        }
-        .question-progress {
-            color: #666;
-            font-size: 1.1rem;
-        }
-        
-        .question-progress-text {
-            color: #667eea;
-            font-size: 0.9rem;
-            font-weight: 600;
-            margin-top: 0.5rem;
-        }
+        * { box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 16px; min-height: 100vh;
+               background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .container { max-width: 560px; margin: 0 auto; }
+        .card { background: white; padding: 1.75rem 1.5rem; border-radius: 20px; box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+                margin-bottom: 1rem; text-align: center; }
+        .hidden { display: none !important; }
+        .session-name { color: rgba(255,255,255,0.9); text-align: center; margin: 0.25rem 0 1rem; font-size: 0.95rem; }
+
+        .banner { position: sticky; top: 0; z-index: 10; margin: -16px -16px 12px; padding: 0.6rem 1rem; text-align: center;
+                  font-weight: 600; font-size: 0.95rem; background: #fff3cd; color: #856404; }
+        .banner.bad { background: #f8d7da; color: #842029; }
+
+        .me { display: flex; align-items: center; gap: 0.9rem; text-align: left; padding: 1rem 1.25rem; }
+        .me .emoji { font-size: 2.6rem; line-height: 1; }
+        .me .label { font-size: 0.8rem; color: #888; text-transform: uppercase; letter-spacing: 0.05em; }
+        .me .alias { font-size: 1.4rem; font-weight: 700; color: #333; }
+        .me .code { margin-left: auto; text-align: right; font-size: 0.8rem; color: #888; }
+        .me .code b { display: block; font-family: monospace; font-size: 1.3rem; color: #667eea; letter-spacing: 0.15em; }
+
+        h1 { color: #333; font-size: 1.6rem; margin: 0 0 0.75rem; }
+        h2 { color: #333; font-size: 1.25rem; margin: 0 0 0.5rem; }
+        p { color: #555; line-height: 1.6; margin: 0.5rem 0; }
+        .big-icon { font-size: 3.5rem; margin-bottom: 0.5rem; }
+
+        button { font-family: inherit; }
+        .primary { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; width: 100%;
+                   padding: 1.1rem; border-radius: 12px; font-size: 1.15rem; font-weight: 600; cursor: pointer; margin-top: 0.75rem; }
+        .primary:disabled { opacity: 0.6; }
+        .link { background: none; border: none; color: #667eea; font-weight: 600; font-size: 0.95rem; cursor: pointer;
+                margin-top: 1rem; text-decoration: underline; }
+        .code-row { display: flex; gap: 0.5rem; margin-top: 0.75rem; }
+        .code-row input { flex: 1; min-width: 0; padding: 0.9rem; font-size: 1.3rem; text-align: center; letter-spacing: 0.3em;
+                          text-transform: uppercase; font-family: monospace; border: 2px solid #e1e5e9; border-radius: 10px; }
+        .code-row button { width: auto; margin: 0; padding: 0 1.25rem; }
+        .error { color: #842029; background: #f8d7da; border-radius: 8px; padding: 0.7rem; margin-top: 0.75rem; font-size: 0.95rem; }
+
+        .qnum { color: #667eea; font-weight: 700; font-size: 1rem; margin-bottom: 0.75rem; }
+        .qtext { font-size: 1.3rem; color: #222; line-height: 1.5; margin-bottom: 1.5rem; }
+        .answers { display: flex; gap: 0.75rem; }
+        .answer { flex: 1; padding: 1.4rem 0.5rem; border: 3px solid transparent; border-radius: 15px; font-size: 1.15rem;
+                  font-weight: 700; color: white; cursor: pointer; transition: transform 0.1s ease, opacity 0.2s ease; }
+        .answer:active { transform: scale(0.97); }
+        .answer.agree { background: linear-gradient(135deg, #28a745 0%, #20c997 100%); }
+        .answer.disagree { background: linear-gradient(135deg, #dc3545 0%, #fd7e14 100%); }
+        .answers.chosen .answer { opacity: 0.45; }
+        .answers.chosen .answer.selected { opacity: 1; border-color: #222; }
+        .answer:disabled { cursor: not-allowed; }
+        .answer-status { margin-top: 1rem; min-height: 1.5em; font-weight: 600; color: #555; }
+        .answer-status.saved { color: #198754; }
+        .answer-status.sending { color: #856404; }
+        .meta { display: flex; justify-content: space-between; gap: 0.5rem; margin-top: 1rem; color: #666; font-size: 0.9rem; flex-wrap: wrap; }
+        .pill { display: inline-block; background: #eef0fb; color: #4b55c4; border-radius: 999px; padding: 0.2rem 0.7rem; font-weight: 600; }
+        .pill.warn { background: #fff3cd; color: #856404; }
+
+        .stats { display: flex; gap: 0.75rem; margin-top: 1rem; }
+        .stat { flex: 1; background: #f8f9fa; border-radius: 12px; padding: 0.9rem 0.5rem; }
+        .stat .v { font-size: 1.6rem; font-weight: 700; color: #667eea; }
+        .stat .k { font-size: 0.8rem; color: #777; }
+        .small { font-size: 0.85rem; color: #888; }
     </style>
 </head>
 <body>
+    <div class="banner hidden" id="banner"></div>
     <div class="container">
-        <div class="header">
-            <h1 class="username">👤 {{ username }}</h1>
-            <p class="session-info">Session: {{ session_id }}</p>
+        <p class="session-name" id="sessionName">{{ session_name or 'Privilege Walk' }}</p>
+
+        <!-- Who am I: always visible once joined -->
+        <div class="card me hidden" id="meCard">
+            <div class="emoji" id="meEmoji"></div>
+            <div>
+                <div class="label">This is you</div>
+                <div class="alias" id="meAlias"></div>
+            </div>
+            <div class="code">Rejoin code<b id="meCode"></b></div>
         </div>
-        
-        <!-- Waiting Screen -->
-        <div class="waiting-screen" id="waitingScreen">
-            <div class="waiting-icon">⏳</div>
-            <div class="waiting-text">Please wait...</div>
-            <div class="waiting-subtext">
-                The instructor will start the privilege walk activity soon. 
-                You'll see questions appear here when it begins.
-            </div>
+
+        <!-- Loading -->
+        <div class="card" id="loadingView">
+            <div class="big-icon">⏳</div>
+            <p>Connecting...</p>
         </div>
-        
-        <!-- Question Screen -->
-        <div class="question-screen" id="questionScreen">
-            <div class="question-header">
-                <div class="question-number" id="questionNumber">Question 1 of 12</div>
-                <div class="question-progress-text" id="questionProgressText">Question 1 of 12</div>
-            </div>
-            
-            <div class="question-text" id="questionText">
-                <!-- Question text will be inserted here -->
-            </div>
-            
-            <div class="answer-buttons">
-                <button class="answer-button agree-button" id="agreeButton" onclick="submitAnswer('agree')">
-                    👍 Agree
-                </button>
-                <button class="answer-button disagree-button" id="disagreeButton" onclick="submitAnswer('disagree')">
-                    👎 Disagree
-                </button>
-            </div>
-            
-            <div class="ranking-display">
-                <div>Your Current Ranking:</div>
-                <div class="ranking-value" id="rankingValue">--</div>
-                <div class="ranking-subtitle" id="rankingSubtitle">Loading...</div>
-            </div>
-            
-            <div class="position-indicator">
-                <div>Your accumulated score:</div>
-                <div class="position-value" id="positionValue">0</div>
+
+        <!-- Join / rejoin -->
+        <div class="card hidden" id="joinView">
+            <div class="big-icon">🚶</div>
+            <h1 id="joinTitle">Join the Privilege Walk</h1>
+            <p id="joinText">You'll get an anonymous name so you can find yourself on the screen. Nobody will know which one is you.</p>
+            <button class="primary" id="joinBtn">Join anonymously</button>
+            <div class="error hidden" id="joinError"></div>
+            <button class="link" id="showRejoin">Already joined on another device or lost your place?</button>
+            <div class="hidden" id="rejoinBox">
+                <p class="small">Enter the 4-character rejoin code that was shown on your screen.</p>
+                <div class="code-row">
+                    <input id="codeInput" maxlength="4" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="CODE">
+                    <button class="primary" id="rejoinBtn">Rejoin</button>
+                </div>
+                <div class="error hidden" id="rejoinError"></div>
             </div>
         </div>
-        
-        <!-- Thank You Screen -->
-        <div class="thank-you-screen" id="thankYouScreen">
-            <div class="thank-you-icon">🎉</div>
-            <div class="thank-you-text">Thank you for participating!</div>
-            <div class="thank-you-subtext">
-                The privilege walk activity has been completed. 
-                Check the main screen to see the final results.
+
+        <!-- Lobby -->
+        <div class="card hidden" id="lobbyView">
+            <div class="big-icon">✅</div>
+            <h2>You're in!</h2>
+            <p>Look for <b id="lobbyAlias"></b> on the main screen. Questions will appear here when your teacher starts.</p>
+            <p class="small">If you lose connection, just reopen this page. You'll come back as the same person. If you change device, use your rejoin code.</p>
+        </div>
+
+        <!-- Question -->
+        <div class="card hidden" id="questionView">
+            <div class="qnum" id="qNum"></div>
+            <div class="qtext" id="qText"></div>
+            <div class="answers" id="answers">
+                <button class="answer agree" data-answer="agree">👍 Agree</button>
+                <button class="answer disagree" data-answer="disagree">👎 Disagree</button>
             </div>
+            <div class="answer-status" id="answerStatus"></div>
+            <div class="meta">
+                <span id="progressText"></span>
+                <span id="timerText"></span>
+            </div>
+            <div class="stats">
+                <div class="stat"><div class="v" id="scoreValue">0</div><div class="k">your steps</div></div>
+                <div class="stat"><div class="v" id="rankValue">-</div><div class="k" id="rankLabel">position</div></div>
+            </div>
+        </div>
+
+        <!-- Finished -->
+        <div class="card hidden" id="finishedView">
+            <div class="big-icon">🎉</div>
+            <h1>Thank you for participating!</h1>
+            <p>The walk is complete. Look at the main screen to see where everyone ended up.</p>
+            <div class="stats">
+                <div class="stat"><div class="v" id="finalScore">0</div><div class="k">your final steps</div></div>
+                <div class="stat"><div class="v" id="finalRank">-</div><div class="k" id="finalRankLabel">position</div></div>
+            </div>
+        </div>
+
+        <!-- Session gone -->
+        <div class="card hidden" id="goneView">
+            <div class="big-icon">🔚</div>
+            <h1>This session has ended</h1>
+            <p>It may have been closed or expired. Ask your teacher for the current QR code.</p>
         </div>
     </div>
 
+    <script src="/static/common.js"></script>
     <script>
-        const sessionId = '{{ session_id }}';
-        const username = '{{ username }}';
-        
-        let currentQuestion = 0;
-        let totalQuestions = 12; // Total number of privilege walk questions
-        let userPosition = 0;
-        let userRanking = 0;
-        let totalUsers = 0;
-        let hasAnswered = false;
-        let pollInterval = null;
+        const sessionId = {{ session_id | tojson }};
+        const ID_KEY = `pw:p:${sessionId}`;
+        const PENDING_KEY = `pw:pending:${sessionId}`;
 
-        function startPolling() {
-            // Poll every 2 seconds for updates
-            pollInterval = setInterval(async () => {
-                try {
-                    const response = await fetch(`/api/session_status/${sessionId}`);
-                    if (response.ok) {
-                        const data = await response.json();
-                        handleStatusUpdate(data);
-                    }
-                } catch (error) {
-                    console.error('Polling error:', error);
+        let me = PW.store.get(ID_KEY);          // {token, alias, emoji, code, pid}
+        let state = null;                       // last server state
+        let pending = PW.store.get(PENDING_KEY); // {index, answer} not yet confirmed by server
+        let sending = false;
+        let gone = false;
+        let lastOkAt = Date.now();
+        let localTimeLeft = null;
+
+        const $ = (id) => document.getElementById(id);
+        const VIEWS = ['loadingView', 'joinView', 'lobbyView', 'questionView', 'finishedView', 'goneView'];
+        function show(view) { VIEWS.forEach(v => $(v).classList.toggle('hidden', v !== view)); }
+        function authHeaders() { return me && me.token ? { 'X-Participant-Token': me.token } : {}; }
+
+        function saveIdentity(identity) {
+            me = { token: identity.token, alias: identity.alias, emoji: identity.emoji, code: identity.code, pid: identity.pid };
+            PW.store.set(ID_KEY, me);
+        }
+        function setPending(p) { pending = p; if (p) PW.store.set(PENDING_KEY, p); else PW.store.del(PENDING_KEY); }
+
+        function banner(text, bad) {
+            const b = $('banner');
+            b.textContent = text || '';
+            b.classList.toggle('hidden', !text);
+            b.classList.toggle('bad', !!bad);
+        }
+
+        function ordinal(n) {
+            const s = ['th', 'st', 'nd', 'rd'], v = n % 100;
+            return n + (s[(v - 20) % 10] || s[v] || s[0]);
+        }
+
+        // ---------- polling ----------
+        async function poll() {
+            if (gone) return true;
+            const r = await PW.api(`/api/s/${sessionId}/state`, { headers: authHeaders() });
+            if (r.status === 404 && r.data.gone) { gone = true; poller.stop(); PW.keepAwake(false); banner(''); show('goneView'); $('meCard').classList.add('hidden'); return true; }
+            if (!r.ok) {
+                if (Date.now() - lastOkAt > 5000) banner('Reconnecting... your answers are safe.', Date.now() - lastOkAt > 30000);
+                return false;
+            }
+            lastOkAt = Date.now();
+            banner('');
+            state = r.data;
+            if (state.me) saveIdentity(state.me);
+            render();
+            if (pending) sendAnswer();
+            return true;
+        }
+
+        function render() {
+            if (!state) return;
+            if (state.session_name) $('sessionName').textContent = state.session_name;
+
+            if (!state.me) {
+                PW.keepAwake(false);
+                $('meCard').classList.add('hidden');
+                const lost = !!me;
+                $('joinTitle').textContent = lost ? "We couldn't find your place" : 'Join the Privilege Walk';
+                $('joinText').textContent = lost
+                    ? 'This device is no longer linked to a participant (you may have been removed or your data was cleared). Use your rejoin code, or join as someone new.'
+                    : "You'll get an anonymous name so you can find yourself on the screen. Nobody will know which one is you.";
+                $('joinBtn').classList.toggle('hidden', !state.joining_open);
+                if (state.joining_open && $('joinError').textContent.startsWith('Joining is closed')) showError('joinError', '');
+                if (!state.joining_open) {
+                    $('rejoinBox').classList.remove('hidden');
+                    $('showRejoin').classList.add('hidden');
+                    showError('joinError', 'Joining is closed. If you joined earlier, enter your rejoin code.');
                 }
-            }, 2000);
-        }
-
-        function handleStatusUpdate(data) {
-            console.log('Status update received:', data);
-            
-            // Check if session has started
-            if (data.status === 'active' && currentQuestion === 0) {
-                currentQuestion = 0;
-                showQuestionScreen();
-                loadCurrentQuestion();
-                loadRankings();
-                loadPosition(); // Load initial position
-            }
-            
-            // Check if we need to move to next question
-            if (data.status === 'active' && data.current_question > currentQuestion) {
-                currentQuestion = data.current_question;
-                hasAnswered = false;
-                loadCurrentQuestion();
-                loadRankings();
-                loadPosition(); // Also load updated position
-                enableAnswerButtons();
-            }
-            
-            // Check if session is finished
-            if (data.status === 'finished') {
-                showThankYouScreen();
-            }
-        }
-
-        async function loadCurrentQuestion() {
-            try {
-                const response = await fetch(`/api/question/${sessionId}`);
-                if (response.ok) {
-                    const data = await response.json();
-                    updateQuestionDisplay(data.question, data.question_number, data.total_questions);
-                }
-            } catch (error) {
-                console.error('Error loading question:', error);
-            }
-        }
-
-        async function loadRankings() {
-            try {
-                const response = await fetch(`/api/rankings/${sessionId}`);
-                if (response.ok) {
-                    const data = await response.json();
-                    if (data.rankings && data.rankings[username]) {
-                        userRanking = data.rankings[username].rank;
-                        totalUsers = data.rankings[username].total_users;
-                        updateRankingDisplay();
-                    }
-                }
-            } catch (error) {
-                console.error('Error loading rankings:', error);
-            }
-        }
-
-        async function loadPosition() {
-            try {
-                const response = await fetch(`/api/positions/${sessionId}`);
-                if (response.ok) {
-                    const data = await response.json();
-                    if (data.positions[username] !== undefined) {
-                        userPosition = data.positions[username];
-                        updatePositionDisplay();
-                    }
-                }
-            } catch (error) {
-                console.error('Error loading position:', error);
-            }
-        }
-
-        function updateQuestionDisplay(question, questionNumber, totalQuestions) {
-            const questionText = document.getElementById('questionText');
-            const questionProgress = document.getElementById('questionNumber');
-            const questionProgressText = document.getElementById('questionProgressText');
-            
-            if (questionText) questionText.textContent = question;
-            if (questionProgress) questionProgress.textContent = `Question ${questionNumber} of ${totalQuestions}`;
-            if (questionProgressText) questionProgressText.textContent = `Question ${questionNumber} of ${totalQuestions}`;
-        }
-
-        function updatePositionDisplay() {
-            const positionElement = document.getElementById('positionValue');
-            if (positionElement) {
-                positionElement.textContent = `Your accumulated score: ${userPosition}`;
-            }
-        }
-
-        function updateRankingDisplay() {
-            const rankingElement = document.getElementById('rankingValue');
-            const rankingSubtitleElement = document.getElementById('rankingSubtitle');
-            
-            if (rankingElement && rankingSubtitleElement) {
-                rankingElement.textContent = userRanking;
-                rankingSubtitleElement.textContent = `of ${totalUsers} participants`;
-            }
-        }
-
-        function showQuestionScreen() {
-            document.getElementById('waitingScreen').style.display = 'none';
-            document.getElementById('questionScreen').style.display = 'block';
-            document.getElementById('thankYouScreen').style.display = 'none';
-            
-            // Load initial position and ranking when question screen is shown
-            loadPosition();
-            loadRankings();
-        }
-
-        function showThankYouScreen() {
-            document.getElementById('waitingScreen').style.display = 'none';
-            document.getElementById('questionScreen').style.display = 'none';
-            document.getElementById('thankYouScreen').style.display = 'block';
-        }
-
-        function enableAnswerButtons() {
-            const agreeBtn = document.getElementById('agreeButton');
-            const disagreeBtn = document.getElementById('disagreeButton');
-            
-            if (agreeBtn) agreeBtn.disabled = false;
-            if (disagreeBtn) disagreeBtn.disabled = false;
-        }
-
-        function disableAnswerButtons() {
-            const agreeBtn = document.getElementById('agreeButton');
-            const disagreeBtn = document.getElementById('disagreeButton');
-            
-            if (agreeBtn) agreeBtn.disabled = true;
-            if (disagreeBtn) disagreeBtn.disabled = true;
-        }
-
-        async function submitAnswer(answer) {
-            if (hasAnswered) {
-                alert('You have already answered this question.');
+                show('joinView');
                 return;
             }
 
-            try {
-                const response = await fetch('/api/submit_answer', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        session_id: sessionId,
-                        username: username,
-                        answer: answer
-                    })
-                });
+            const m = state.me;
+            $('meCard').classList.remove('hidden');
+            $('meEmoji').textContent = m.emoji;
+            $('meAlias').textContent = m.alias;
+            $('meCode').textContent = m.code;
 
-                const data = await response.json();
-                if (data.success) {
-                    hasAnswered = true;
-                    disableAnswerButtons();
-                    
-                    // Load updated position and ranking
-                    setTimeout(() => {
-                        loadPosition();
-                        loadRankings();
-                    }, 1000);
-                } else {
-                    alert('Error submitting answer: ' + data.error);
-                }
-            } catch (error) {
-                console.error('Error:', error);
-                alert('Error submitting answer');
+            if (state.status === 'waiting') {
+                PW.keepAwake(false);
+                $('lobbyAlias').textContent = `${m.emoji} ${m.alias}`;
+                show('lobbyView');
+            } else if (state.status === 'active' && state.question) {
+                PW.keepAwake(true);
+                renderQuestion();
+                show('questionView');
+            } else if (state.status === 'finished') {
+                PW.keepAwake(false);
+                setPending(null);
+                $('finalScore').textContent = (m.score > 0 ? '+' : '') + m.score;
+                $('finalRank').textContent = m.rank ? ordinal(m.rank) : '-';
+                $('finalRankLabel').textContent = `of ${m.participants}`;
+                show('finishedView');
             }
         }
 
-        // Start polling when page loads
-        document.addEventListener('DOMContentLoaded', function() {
-            startPolling();
+        function renderQuestion() {
+            const q = state.question, m = state.me;
+            if (pending && pending.index !== q.index) setPending(null); // question moved on
+            $('qNum').textContent = `Question ${q.number} of ${state.total_questions}`;
+            $('qText').textContent = q.text;
+
+            const chosen = pending ? pending.answer : m.answer;
+            const answers = $('answers');
+            answers.classList.toggle('chosen', !!chosen);
+            answers.querySelectorAll('.answer').forEach(b => {
+                b.classList.toggle('selected', b.dataset.answer === chosen);
+                b.disabled = state.paused;
+            });
+
+            const status = $('answerStatus');
+            status.className = 'answer-status';
+            if (state.paused) {
+                status.textContent = '⏸ Your teacher has paused the walk.';
+            } else if (pending) {
+                status.textContent = 'Sending your answer...';
+                status.classList.add('sending');
+            } else if (m.answer) {
+                status.textContent = `✓ Saved: ${m.answer === 'agree' ? 'Agree' : 'Disagree'} (tap the other to change)`;
+                status.classList.add('saved');
+            } else {
+                status.textContent = 'Tap Agree or Disagree';
+            }
+
+            let score = m.score;
+            // Show the step the pending answer will make, so the screen feels instant.
+            if (pending && pending.answer !== m.answer) {
+                if (m.answer) score -= (m.answer === 'agree' ? 1 : -1);
+                score += (pending.answer === 'agree' ? 1 : -1);
+            }
+            $('scoreValue').textContent = (score > 0 ? '+' : '') + score;
+            $('rankValue').textContent = m.rank ? ordinal(m.rank) : '-';
+            $('rankLabel').textContent = `of ${m.participants}`;
+
+            const prog = state.progress;
+            $('progressText').textContent = prog ? `${prog.answered} of ${prog.total} answered` : '';
+            localTimeLeft = state.time_left;
+            renderTimer();
+        }
+
+        function renderTimer() {
+            const t = $('timerText');
+            if (!state || state.status !== 'active') { t.textContent = ''; return; }
+            if (state.advance_in !== null && state.advance_in !== undefined) {
+                t.innerHTML = '';
+                t.appendChild(PW.el('span', 'pill', 'Next question coming...'));
+            } else if (localTimeLeft !== null && localTimeLeft !== undefined) {
+                t.innerHTML = '';
+                t.appendChild(PW.el('span', 'pill' + (localTimeLeft <= 10 ? ' warn' : ''), `⏱ ${localTimeLeft}s`));
+            } else {
+                t.textContent = '';
+            }
+        }
+        setInterval(() => {
+            if (state && !state.paused && localTimeLeft !== null && localTimeLeft > 0) { localTimeLeft--; renderTimer(); }
+        }, 1000);
+
+        // ---------- answering ----------
+        $('answers').addEventListener('click', (e) => {
+            const btn = e.target.closest('.answer');
+            if (!btn || btn.disabled || !state || !state.question) return;
+            const current = pending ? pending.answer : state.me.answer;
+            if (current === btn.dataset.answer && !pending) return;
+            setPending({ index: state.question.index, answer: btn.dataset.answer });
+            PW.keepAwake(true);
+            renderQuestion();
+            sendAnswer();
         });
 
-        // Clean up polling when page unloads
-        window.addEventListener('beforeunload', function() {
-            if (pollInterval) {
-                clearInterval(pollInterval);
+        async function sendAnswer() {
+            if (sending || !pending || !me) return;
+            sending = true;
+            const p = pending;
+            const r = await PW.api(`/api/s/${sessionId}/answer`, {
+                method: 'POST', headers: authHeaders(),
+                body: { answer: p.answer, question_index: p.index }
+            });
+            sending = false;
+            if (r.ok) {
+                if (pending === p) setPending(null);
+                if (state && state.me && state.question && state.question.index === p.index) {
+                    state.me.answer = p.answer;
+                    state.me.score = r.data.score;
+                }
+                render();
+                if (pending) sendAnswer(); // they changed their mind while sending
+                poller.kick();
+            } else if (r.status === 409) {
+                if (pending === p) setPending(null);
+                banner('That question closed before your answer arrived.', false);
+                setTimeout(() => banner(''), 4000);
+                poller.kick();
+            } else if (r.status === 401) {
+                setPending(null);
+                poller.kick();
+            } else if (r.status === 404 && r.data.gone) {
+                poller.kick();
+            } else {
+                // Network down or server busy: keep it and retry.
+                if (Date.now() - lastOkAt > 5000 || r.network) banner('Reconnecting... your answer will be sent when you are back online.');
+                setTimeout(sendAnswer, 2000);
+            }
+        }
+
+        // ---------- joining ----------
+        function showError(id, text) { const e = $(id); e.textContent = text || ''; e.classList.toggle('hidden', !text); }
+
+        $('joinBtn').addEventListener('click', async () => {
+            const btn = $('joinBtn');
+            btn.disabled = true;
+            btn.textContent = 'Joining...';
+            showError('joinError', '');
+            let r = null;
+            for (let attempt = 0; attempt < 3; attempt++) {
+                // The token header (if any) makes this safe to retry: the server
+                // returns the same participant instead of creating a duplicate.
+                r = await PW.api(`/api/s/${sessionId}/join`, { method: 'POST', body: {}, headers: authHeaders(), timeout: 15000 });
+                if (r.ok || (!r.network && r.status < 500)) break;
+                await new Promise(res => setTimeout(res, 1500));
+            }
+            btn.disabled = false;
+            btn.textContent = 'Join anonymously';
+            if (r.ok) {
+                saveIdentity(r.data.me);
+                PW.keepAwake(true);
+                poller.kick();
+            } else {
+                showError('joinError', r.data.error || 'Could not reach the server. Check your connection and try again.');
             }
         });
+
+        $('showRejoin').addEventListener('click', () => {
+            $('rejoinBox').classList.remove('hidden');
+            $('showRejoin').classList.add('hidden');
+            $('codeInput').focus();
+        });
+
+        async function rejoin() {
+            const code = $('codeInput').value.trim().toUpperCase();
+            if (code.length !== 4) { showError('rejoinError', 'The code has 4 characters.'); return; }
+            showError('rejoinError', '');
+            $('rejoinBtn').disabled = true;
+            const r = await PW.api(`/api/s/${sessionId}/rejoin`, { method: 'POST', body: { code: code }, timeout: 15000 });
+            $('rejoinBtn').disabled = false;
+            if (r.ok) {
+                saveIdentity(r.data.me);
+                setPending(null);
+                poller.kick();
+            } else {
+                showError('rejoinError', r.data.error || 'Could not reach the server. Try again.');
+            }
+        }
+        $('rejoinBtn').addEventListener('click', rejoin);
+        $('codeInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') rejoin(); });
+
+        // Clean the URL (old links carried ?username=...)
+        if (window.location.search) history.replaceState(null, '', window.location.pathname);
+
+        const poller = PW.poller(poll, 2500, 8000);
     </script>
 </body>
-</html> 
+</html>

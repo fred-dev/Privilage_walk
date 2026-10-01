@@ -92,3 +92,7 @@ Thumbs.db
 
 # OS / editor
 Desktop.ini
+
+# Session persistence temp/backup files
+sessions.json.tmp
+sessions.json.corrupt

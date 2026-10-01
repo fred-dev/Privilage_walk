@@ -1,283 +1,91 @@
-# 🚶‍♂️ Privilege Walk Interactive Site
+# 🚶 Privilege Walk
 
-An interactive web application for conducting privilege walk activities in educational settings. Students scan a QR code to join, answer questions, and see their positions update in real-time on a shared display.
+An interactive web app for running privilege walk activities in class. Students scan a QR code on their
+phone, answer agree/disagree statements anonymously, and see the class "walk" on the projector.
 
-## ✨ Features
+Built to run **several classes at once** on unreliable school wifi with phones that go to sleep.
 
-- **Session Management**: Create unique sessions with custom names to avoid interference between different classes
-- **QR Code Generation**: Automatic QR code generation for easy student access
-- **Real-time Updates**: Live position updates using WebSocket connections
-- **Mobile-Friendly**: Students can participate using their phones
-- **Progress Tracking**: Visual progress indicators and question management
-- **Final Results**: Ranked final positions displayed at the end
+## How it works
 
-## 🚀 Quick Start
+### Teachers
+1. Open the site and create a session (give it a name like "Sociology 101 - Section A").
+   Every teacher creates their own session; each one has its own QR code and nothing is shared between them.
+2. Project the teacher screen. Students scan the QR code and appear in the lobby.
+3. Press **Begin**. Each statement appears on every phone and on the projector.
+4. When the walk ends, look at the final positions, download a CSV, or run it again with the same students.
 
-### Prerequisites
+The teacher screen is protected: only the browser that created the session (or someone with the private
+**teacher link**, under Settings) can control it. Students who type in the teacher URL get "access needed".
+If your laptop restarts, reopen the site on the same browser (your sessions are listed on the home page)
+or use the teacher link on another device.
 
-- Python 3.7 or higher
-- pip (Python package installer)
+### Students
+- Tap **Join anonymously** and get a random name and animal, like "Teal Fox 🦊". Students see who they are
+  at the top of their phone; nobody else knows which one is theirs. No names are typed or stored.
+- The phone remembers who they are. If they lose wifi, close the tab, or their phone sleeps, they reopen the
+  page (or rescan the QR code) and are the same person, with their answers intact.
+- If they switch device or clear their browser, they enter the 4-character **rejoin code** shown on their screen.
+- Answers given while offline are kept on the phone and sent automatically when the connection returns.
+  They can change their answer until the question closes. A retry or a double tap never counts twice.
 
-### Installation
+## Nobody gets stuck waiting
 
-1. **Clone or download the project files**
+- **Disconnected students are not waited for.** A phone that hasn't checked in for 20 seconds (asleep, out of
+  wifi, switched apps) is shown grey and the class moves on without it. When it comes back it joins the
+  current question.
+- **Move on when everyone connected has answered** (on by default, with a 3 second pause so the room sees the
+  last step).
+- **Stragglers:** once 3 in 4 connected students have answered, the rest get a short visible countdown
+  (20 seconds by default, adjustable or off).
+- **Optional timer** per question (off by default).
+- **Next** always works, including on the last question (it becomes **Finish walk**). **Back**, **Pause** and
+  **Resume** are available, and ghost entries (someone who joined twice) can be removed.
+- Unanswered questions count as no step.
+- Students who arrive late can join mid-walk (turn off "Allow new students to join" to lock the room).
 
-2. **Set up UV environment (recommended)**
-   ```bash
-   # On Mac/Linux
-   ./setup.sh
-   
-   # On Windows
-   setup.bat
-   ```
-   
-   Or manually:
-   ```bash
-   uv sync
-   ```
+## Running it
 
-3. **Run the application**
-   ```bash
-   # On Mac/Linux
-   ./run.sh
-   
-   # On Windows
-   run.bat
-   
-   # Or directly with UV
-   uv run python run.py
-   ```
+### Locally
+```bash
+pip install -r requirements.txt
+python app.py                 # http://localhost:5001
+```
+Set `LOCAL_TESTING=true` to put your machine's LAN address in the QR code so phones on the same wifi can join.
 
-4. **Open your browser**
-   - Navigate to `http://localhost:5001`
-   - Create a new session with a custom name
+### Production (Render)
+`render.yaml` and `gunicorn.conf.py` are set up already. The start command is
+`gunicorn app:app -c gunicorn.conf.py`.
 
-## 📱 How It Works
+**Important:** all live state is in memory in one process, so gunicorn must run exactly **one worker**
+(`gunicorn.conf.py` enforces this and uses 32 threads instead). Do not raise `WEB_CONCURRENCY` or add workers.
+Five classes of 35 students polling every few seconds is about 65 requests/second at ~4 ms each, well within
+one worker.
 
-### 1. Instructor Setup
-- Go to the main page and create a new session
-- Give your session a meaningful name (e.g., "Sociology 101 - Section A")
-- You'll get a unique session ID and QR code
+State is saved to `sessions.json` every couple of seconds, so a crashed or restarted worker comes back with
+every class intact. On Render's free plan the disk is wiped on redeploy, and the service sleeps after
+15 minutes without traffic (the first visit then takes up to a minute). **Don't redeploy during a class,
+and open the site a few minutes before class starts.** A paid instance with a persistent disk
+(set `PW_DATA_FILE` to a path on it) removes both limits.
 
-### 2. Student Participation
-- Students scan the QR code with their phones
-- They enter a nickname (can be fake/alias)
-- Students see a "Please wait" message until you start
+### Environment variables
+| Variable | Default | Purpose |
+|---|---|---|
+| `PUBLIC_BASE_URL` | detected from the request | Force the URL used in QR codes, e.g. `https://privilage-walk.onrender.com` |
+| `LOCAL_TESTING` | `false` | Use this machine's LAN IP in QR codes |
+| `PW_DATA_FILE` | `sessions.json` | Where state is saved (empty to disable) |
+| `PW_SESSION_TTL_HOURS` | `24` | Sessions unused for this long are deleted |
+| `GUNICORN_THREADS` | `32` | Request threads in the single worker |
 
-### 3. Running the Activity
-- Watch the student count increase as they join
-- Press "Start Privilege Walk" when ready
-- Students will see questions appear on their screens
-- Each student answers with Agree/Disagree
-- Positions update in real-time on the main display
-
-### 4. Question Flow
-- Questions advance only when ALL students have answered
-- Students move up (agree) or down (disagree) based on their answers
-- Movement is calculated so full agreement = top, full disagreement = bottom
-
-### 5. Final Results
-- When all questions are answered, final positions are displayed
-- Students see a "Thank you" message
-- Results are ranked from highest to lowest position
-
-## 🔧 Technical Details
-
-### Configuration
-The application uses `config.json` for easy configuration:
-
-```json
-{
-  "server": {
-    "host": "0.0.0.0",
-    "port": 5001,
-    "debug": true
-  },
-  "network": {
-    "local_testing": true,
-    "local_ip": "192.168.1.9",
-    "server_domain": "yourdomain.com"
-  },
-  "questions_file": "questions.json"
-}
+### Tests
+```bash
+pip install -r requirements-test.txt
+python -m pytest test_app.py -v
 ```
 
-- **Local Testing**: Set `local_testing: true` and update `local_ip` with your computer's IP
-- **Production**: Set `local_testing: false` and update `server_domain` with your domain
-- **Questions**: Modify `questions.json` to customize the privilege walk statements
+## Customising questions
+Edit `questions.json`. New sessions pick up the changes; running sessions keep the questions they started with.
 
-### Architecture
-- **Backend**: Python Flask with Flask-SocketIO
-- **Frontend**: HTML/CSS/JavaScript with Socket.IO client
-- **Real-time Communication**: WebSocket connections for live updates
-- **Session Isolation**: Unique session IDs prevent cross-interference
-- **Dependency Management**: UV for fast, reliable Python package management
-
-### File Structure
-```
-Privilege_walk/
-├── app.py                 # Main Flask application
-├── config.json            # Configuration file (IP addresses, ports, etc.)
-├── questions.json         # Privilege walk questions
-├── pyproject.toml         # UV project configuration
-├── README.md              # This file
-└── templates/             # HTML templates
-    ├── index.html         # Session creation page
-    ├── instructor.html    # Instructor view with QR code
-    ├── student_join.html  # Student username entry
-    └── student.html       # Student question interface
-```
-
-### Questions Included
-The system includes 12 privilege walk statements covering various aspects of privilege:
-- Body size and appearance
-- Mental health
-- Neurodiversity
-- Sexuality and gender identity
-- Physical ability
-- Education access
-- Race and skin color
-- Citizenship status
-- Language fluency
-- Financial security
-- Housing stability
-
-## 🌐 Network Setup
-
-### For Local Use
-- Run on `localhost:5001`
-- Students connect via your computer's IP address
-- Ensure all devices are on the same network
-
-### For Production/Classroom Use
-- Deploy to a web server or cloud platform
-- Use HTTPS for secure connections
-- Consider using a service like Heroku, Railway, or DigitalOcean
-
-### Network Requirements
-- All devices must be on the same network
-- Port 5001 must be accessible
-- WebSocket connections must be allowed
-
-## 🎯 Best Practices
-
-### Session Management
-- Use descriptive session names
-- Each class/group should have a unique session
-- Sessions are automatically cleaned up when the server restarts
-
-### Student Experience
-- Encourage students to use memorable nicknames
-- Ensure good network connectivity
-- Have students test the QR code before starting
-
-### Technical Considerations
-- Test with a small group first
-- Monitor network performance
-- Have a backup plan if technology fails
-
-## 🐛 Troubleshooting
-
-### Common Issues
-
-**Students can't join:**
-- Check network connectivity
-- Verify the session ID is correct
-- Ensure the server is running
-
-**QR code not working:**
-- Verify the URL is accessible from student devices
-- Check if students are on the same network
-- Try accessing the URL directly in a browser
-
-**Real-time updates not working:**
-- Check browser console for WebSocket errors
-- Verify firewall settings allow WebSocket connections
-- Restart the server if needed
-
-**Questions not advancing:**
-- Ensure all students have answered
-- Check browser console for errors
-- Verify all students are still connected
-
-### Debug Mode
-The application runs in debug mode by default. Check the terminal for error messages and connection logs.
-
-## 🔒 Privacy & Security
-
-- Student nicknames are not stored permanently
-- Session data is only kept in memory
-- No personal information is collected
-- Sessions are isolated by unique IDs
-
-## 🆔 User Tracking & Session Management
-
-### How Users Are Tracked
-- **Username**: Students choose any nickname (can be fake/alias)
-- **Session ID**: Each class gets a unique session identifier
-- **No Persistent ID**: Same person could use different usernames in different sessions
-- **Network IP**: Students connect via your computer's network IP address
-
-### Session Options After Completion
-1. **Reset Session**: Keep same students, start fresh questions
-2. **New Session**: Generate new QR code and session ID
-3. **Back to Setup**: Return to student join view
-
-### For Multiple Rounds
-- **Same Class, Different Questions**: Use "Reset Session" - students keep usernames
-- **Different Class**: Use "New Session" - fresh start with new QR code
-- **Tracking Individuals**: Currently not supported - would require persistent IDs or IP tracking
-
-## 📝 Customization
-
-### Adding/Modifying Questions
-Edit the `QUESTIONS` list in `app.py`:
-```python
-QUESTIONS = [
-    "Your custom question here?",
-    "Another question?",
-    # ... more questions
-]
-```
-
-### Styling Changes
-Modify the CSS in the HTML template files to change colors, fonts, and layout.
-
-### Question Logic
-The movement calculation can be adjusted in the `submit_answer` function in `app.py`.
-
-## 🤝 Contributing
-
-Feel free to modify and improve this application for your specific needs. Consider:
-- Adding more question categories
-- Implementing data export features
-- Adding analytics and reporting
-- Improving the mobile interface
-
-## 🚀 Potential Improvements
-
-### User Tracking
-- **Persistent IDs**: Generate unique IDs for students to track across sessions
-- **IP Tracking**: Track student IP addresses for identification
-- **Account System**: Simple login system for returning students
-
-### Session Management
-- **Question Banks**: Multiple sets of questions for different topics
-- **Results History**: Save and compare results across sessions
-- **Student Progress**: Track individual student progress over time
-
-### Features
-- **Timer**: Add countdown for question answering
-- **Anonymous Mode**: Hide usernames during the walk
-- **Export Results**: Download results as CSV/PDF
-- **Custom Scoring**: Adjustable scoring for different privilege dimensions
-
-## 📄 License
-
-This project is open source and available for educational use. Please respect the educational context and use responsibly.
-
----
-
-**Happy teaching!** 🎓
-
-For questions or support, check the troubleshooting section or review the code comments for technical details. 
+## Privacy
+- Students are identified only by a random alias. No names, emails or IP addresses are stored with answers.
+- Sessions and their answers are deleted 24 hours after last use.
+- The CSV export contains aliases and answers only.

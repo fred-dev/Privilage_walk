@@ -3,2056 +3,538 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Privilege Walk - Instructor View</title>
+    <title>{{ session_name }} - Privilege Walk (Teacher)</title>
     <style>
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            margin: 0;
-            padding: 20px;
-            background: #f5f5f5;
-            min-height: 100vh;
-        }
-        
-        .header {
-            text-align: center;
-            margin-bottom: 2rem;
-        }
-        
-        .session-name {
-            font-size: 2rem;
-            color: #333;
-            margin-bottom: 0.5rem;
-        }
-        
-        .session-id {
-            color: #666;
-            font-size: 1.1rem;
-        }
-        
-        .main-content {
-            display: flex;
-            gap: 3rem;
-            max-width: 1200px;
-            margin: 0 auto;
-            align-items: flex-start;
-        }
-        
-        .left-panel {
-            flex: 1;
-            background: white;
-            padding: 2rem;
-            border-radius: 15px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
-            text-align: center;
-        }
-        
-        .right-panel {
-            flex: 1;
-            background: white;
-            padding: 2rem;
-            border-radius: 15px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
-        }
-        
-        .network-info {
-            background: #f8f9fa;
-            padding: 1.5rem;
-            border-radius: 10px;
-            margin-bottom: 2rem;
-            border-left: 4px solid #667eea;
-        }
-        
-        .network-info h3 {
-            margin: 0 0 1rem 0;
-            color: #333;
-            font-size: 1.2rem;
-        }
-        
-        .ip-address {
-            background: #667eea;
-            color: white;
-            padding: 0.75rem;
-            border-radius: 8px;
-            font-family: monospace;
-            font-size: 1.2rem;
-            font-weight: 600;
-            text-align: center;
-            margin: 0.5rem 0;
-        }
-        
-        .ip-note {
-            color: #666;
-            font-size: 0.9rem;
-            margin: 0.5rem 0 0 0;
-            text-align: center;
-        }
-        
-        .qr-container {
-            margin: 2rem 0;
-            padding: 2rem;
-            border: 2px dashed #ddd;
-            border-radius: 10px;
-        }
-        
-        .qr-instructions {
-            margin-bottom: 2rem;
-            text-align: left;
-        }
-        
-        .qr-instructions ol {
-            text-align: left;
-            margin: 0;
-            padding-left: 1.5rem;
-        }
-        
-        .qr-instructions li {
-            margin: 0.5rem 0;
-            color: #555;
-        }
-        
-        .qr-code {
-            margin: 2rem 0;
-            padding: 2rem;
-            border: 2px dashed #ddd;
-            border-radius: 10px;
-            text-align: center;
-        }
-        
-        .qr-code img {
-            max-width: 300px;
-            height: auto;
-            margin-bottom: 1rem;
-        }
-        
-        .qr-controls {
-            margin-top: 1rem;
-        }
-        
-        .refresh-btn {
-            background: #007bff;
-            color: white;
-            border: none;
-            padding: 0.5rem 1rem;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 0.9rem;
-        }
-        
-        .refresh-btn:hover {
-            background: #0056b3;
-        }
-        
-        .url-display {
-            background: #f8f9fa;
-            padding: 0.75rem;
-            border-radius: 5px;
-            font-family: monospace;
-            font-size: 0.9rem;
-            margin: 0.5rem 0;
-            word-break: break-all;
-        }
-        
-        .debug-info {
-            font-size: 0.8rem;
-            color: #888;
-            margin-top: 1rem;
-        }
-        
-        .status {
-            padding: 1rem;
-            border-radius: 8px;
-            margin: 1rem 0;
-            font-weight: 600;
-        }
-        
-        .status.waiting {
-            background: #fff3cd;
-            color: #856404;
-            border: 1px solid #ffeaa7;
-        }
-        
-        .status.active {
-            background: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
-        }
-        
-        .status.finished {
-            background: #d1ecf1;
-            color: #0c5460;
-            border: 1px solid #bee5eb;
-        }
-        
-        .testing-note {
-            background: #e7f3ff;
-            padding: 1rem;
-            border-radius: 8px;
-            margin: 1rem 0;
-            border-left: 4px solid #007bff;
-        }
-        
-        .user-count {
-            font-size: 3rem;
-            font-weight: bold;
-            color: #667eea;
-            margin: 1rem 0;
-        }
-        
-        .go-button {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border: none;
-            padding: 1rem 2rem;
-            border-radius: 10px;
-            font-size: 1.2rem;
-            font-weight: 600;
-            cursor: pointer;
-            margin: 1rem 0;
-            transition: all 0.3s ease;
-        }
-        
-        .go-button:hover:not(:disabled) {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
-        }
-        
-        .go-button:disabled {
-            background: #ccc;
-            cursor: not-allowed;
-            transform: none;
-            box-shadow: none;
-        }
-        
-        .user-list {
-            margin-top: 1rem;
-        }
-        
-        .user-item {
-            background: #f8f9fa;
-            padding: 1rem;
-            margin: 0.5rem 0;
-            border-radius: 8px;
-            border-left: 4px solid #667eea;
-        }
-        
-        .user-count-display {
-            background: #e7f3ff;
-            padding: 1rem;
-            border-radius: 8px;
-            margin-bottom: 1rem;
-            border-left: 4px solid #007bff;
-            text-align: center;
-        }
-        
-        .total-users {
-            font-size: 1.2rem;
-            font-weight: 600;
-            color: #0056b3;
-        }
-        
-        .question-progress-display {
-            background: #fff3cd;
-            padding: 1rem;
-            border-radius: 8px;
-            margin-bottom: 1rem;
-            border-left: 4px solid #ffc107;
-        }
-        
-        .question-progress-display.all-answered {
-            background: #d4edda;
-            border-left-color: #28a745;
-        }
-        
-        .question-progress-display h3 {
-            margin: 0 0 0.5rem 0;
-            color: #856404;
-            font-size: 1rem;
-        }
-        
-        .question-progress-display.all-answered h3 {
-            color: #155724;
-        }
-        
-        .current-question {
-            font-weight: 600;
-            color: #856404;
-            margin-bottom: 0.5rem;
-        }
-        
-        .question-progress-display.all-answered .current-question {
-            color: #155724;
-        }
-        
-        .answered-status {
-            font-size: 0.9rem;
-            color: #856404;
-        }
-        
-        .question-progress-display.all-answered .answered-status {
-            color: #155724;
-        }
-        
-        .next-question-btn {
-            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
-            color: white;
-            border: none;
-            padding: 0.75rem 1.5rem;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 1rem;
-            font-weight: 600;
-            margin-top: 1rem;
-            width: 100%;
-            transition: all 0.3s ease;
-        }
-        
-        .next-question-btn:hover:not(:disabled) {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(40, 167, 69, 0.3);
-        }
-        
-        .user-item.answered {
-            border-left-color: #28a745;
-            background: #d4edda;
-        }
-        
-        .user-item.pending {
-            border-left-color: #ffc107;
-            background: #fff3cd;
-        }
-        
-        .privilege-walk-view {
-            display: none;
-            max-width: 99vw;
-            margin: 0 auto;
-            background: white;
-            padding: 2rem;
-            border-radius: 15px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
-        }
-        
+        * { box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 16px; background: #f5f5f7; color: #333; min-height: 100vh; }
+        .hidden { display: none !important; }
+        button { font-family: inherit; }
 
-        
-        .walk-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 2rem;
-            padding-bottom: 1rem;
-            border-bottom: 2px solid #eee;
-        }
-        
-        .back-btn {
-            background: #6c757d;
-            color: white;
-            border: none;
-            padding: 0.75rem 1.5rem;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 1rem;
-        }
-        
-        .question-display {
-            text-align: center;
-            margin-bottom: 2rem;
-            padding: 2rem;
-            background: #f8f9fa;
-            border-radius: 10px;
-        }
-        
-        .question-text {
-            font-size: 1.5rem;
-            color: #333;
-            margin-bottom: 1rem;
-            font-weight: 600;
-        }
-        
-        .question-progress {
-            color: #666;
-            font-size: 1.1rem;
-        }
-        
-        .walk-container {
-            position: relative;
-            height: 600px;
-            background: linear-gradient(to bottom, #e8f5e8 0%, #f0f8f0 50%, #f8e8e8 100%);
-            border-radius: 10px;
-            border: 2px solid #ddd;
-            margin: 2rem 0;
-            overflow: hidden;
-        }
-        
-        .walk-grid {
-            position: absolute;
-            top: 8px;
-            left: 8px;
-            right: 8px;
-            bottom: 8px;
-            display: grid;
-            /* Grid rows and columns will be set dynamically via JavaScript */
-            gap: 1px;
-            pointer-events: none;
-            z-index: 1;
-        }
-        
-        .grid-cell {
-            background: rgba(255, 255, 255, 0.15);
-            border-right: 1px solid #000000;
-            border-bottom: 1px solid #000000;
-            box-sizing: border-box;
-        }
-        
-        .grid-label-cell {
-            background: rgba(255, 255, 255, 0.9);
-            border-right: 1px solid #000000;
-            border-bottom: 1px solid #000000;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 0.8rem;
-            font-weight: 600;
-            color: #666;
-            text-align: center;
-            box-sizing: border-box;
-        }
-        
+        .banner { position: sticky; top: 0; z-index: 50; margin: -16px -16px 12px; padding: 0.6rem 1rem; text-align: center;
+                  font-weight: 600; background: #f8d7da; color: #842029; }
 
-        
-        .user-marker {
-            position: absolute;
-            background: #667eea;
-            color: white;
-            padding: 0.25rem 0.5rem;
-            border-radius: 8px;
-            font-weight: 600;
-            text-align: center;
-            min-width: 60px;
-            max-width: 80px;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
-            transition: all 0.5s ease;
-            font-size: 0.75rem;
-            z-index: 3;
-            transform: translate(-50%, -50%); /* Center the marker on the grid position */
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-        
-        .user-marker.answered {
-            background: #28a745;
-        }
-        
-        .user-marker.pending {
-            background: #ffc107;
-            color: #333;
-        }
-        
-        .final-results {
-            display: none;
-            max-width: 1200px;
-            margin: 0 auto;
-            background: white;
-            padding: 2rem;
-            border-radius: 15px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
-            text-align: center;
-        }
-        
-        .final-positions {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 1rem;
-            margin: 2rem 0;
-        }
-        
-        .position-card {
-            background: #f8f9fa;
-            padding: 1.5rem;
-            border-radius: 10px;
-            border-left: 4px solid #667eea;
-        }
-        
-        .position-rank {
-            font-size: 2rem;
-            font-weight: bold;
-            color: #667eea;
-            margin-bottom: 0.5rem;
-        }
-        
-        .position-name {
-            font-size: 1.2rem;
-            font-weight: 600;
-            color: #333;
-            margin-bottom: 0.5rem;
-        }
-        
-        .position-value {
-            color: #666;
-        }
-        
-        .session-actions {
-            margin-top: 2rem;
-            padding-top: 2rem;
-            border-top: 2px solid #eee;
-        }
-        
-        .action-buttons {
-            display: flex;
-            gap: 1rem;
-            justify-content: center;
-            flex-wrap: wrap;
-            margin-top: 1rem;
-        }
-        
-        .action-btn {
-            padding: 1rem 2rem;
-            border: none;
-            border-radius: 8px;
-            font-size: 1rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-        
-        .reset-btn {
-            background: linear-gradient(135deg, #ffc107 0%, #fd7e14 100%);
-            color: white;
-        }
-        
-        .new-btn {
-            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
-            color: white;
-        }
-        .header-actions {
-            display: flex;
-            gap: 1rem;
-            margin-top: 1rem;
-        }
-        
-        .resume-btn {
-            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
-            color: white;
-            border: none;
-            padding: 0.75rem 1.5rem;
-            border-radius: 8px;
-            cursor: pointer;
-            font-weight: 600;
-            transition: all 0.3s ease;
-        }
-        
-        .resume-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(40, 167, 69, 0.3);
-        }
-        .copy-btn {
-            background: #28a745;
-            color: white;
-            border: none;
-            padding: 0.5rem 1rem;
-            border-radius: 5px;
-            cursor: pointer;
-            margin-top: 0.5rem;
-            font-size: 0.9rem;
-        }
-        
-        .copy-btn:hover {
-            background: #218838;
-        }
-        
-        .session-controls {
-            margin: 2rem 0;
-        }
-        
-        .start-btn, .stop-btn {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border: none;
-            padding: 1rem 2rem;
-            border-radius: 10px;
-            font-size: 1.1rem;
-            font-weight: 600;
-            cursor: pointer;
-            margin: 0.5rem;
-            transition: transform 0.2s ease;
-        }
-        
-        .start-btn:hover, .stop-btn:hover {
-            transform: translateY(-2px);
-        }
-        
-        .stop-btn {
-            background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
-        }
-        
-        .question-display {
-            margin-top: 2rem;
-            padding: 1.5rem;
-            background: #f8f9fa;
-            border-radius: 10px;
-            border-left: 4px solid #667eea;
-        }
-        
-        .question-display h3 {
-            margin: 0 0 1rem 0;
-            color: #333;
-        }
-        
-        .question-text {
-            color: #666;
-            line-height: 1.6;
-            font-style: italic;
-        }
-        
-        .participant-display {
-            margin-top: 2rem;
-            padding: 1.5rem;
-            background: #f8f9fa;
-            border-radius: 10px;
-            border-left: 4px solid #667eea;
-        }
-        
-        .participant-display h3 {
-            margin: 0 0 1rem 0;
-            color: #333;
-            font-size: 1.1rem;
-        }
-        
-        .participant-list {
-            display: flex;
-            flex-direction: column;
-            gap: 0.5rem;
-        }
-        
-        .participant-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 0.75rem;
-            background: white;
-            border-radius: 8px;
-            border-left: 4px solid #667eea;
-        }
-        
-        .participant-name {
-            font-weight: 600;
-            color: #333;
-        }
-        
-        .participant-score {
-            font-weight: 600;
-            color: #667eea;
-            font-size: 1.1rem;
-        }
-        
-        .participant-answered {
-            border-left-color: #28a745;
-        }
-        
-        .participant-pending {
-            border-left-color: #ffc107;
-        }
-        
-        .question-progress-control-bar {
-            background: #f8f9fa;
-            border: 2px solid #667eea;
-            border-radius: 10px;
-            padding: 1rem;
-            margin: 1rem 0;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        
-        .question-info {
-            flex: 1;
-            margin-right: 1rem;
-        }
-        
-        .question-text-display {
-            font-size: 1.1rem;
-            font-weight: 600;
-            color: #333;
-            margin-bottom: 0.5rem;
-        }
-        
-        .question-stats {
-            font-size: 0.9rem;
-            color: #666;
-        }
-        
-        .question-controls {
-            display: flex;
-            gap: 0.5rem;
-        }
-        
-        .question-nav-btn {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border: none;
-            padding: 0.75rem 1.5rem;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 1rem;
-            font-weight: 600;
-            transition: all 0.3s ease;
-            min-width: 120px;
-        }
-        
-        .question-nav-btn:hover:not(:disabled) {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
-        }
-        
-        .question-nav-btn:disabled {
-            background: #ccc;
-            cursor: not-allowed;
-            transform: none;
-            box-shadow: none;
+        header { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem; }
+        header h1 { margin: 0; font-size: 1.6rem; }
+        .chip { display: inline-block; padding: 0.3rem 0.8rem; border-radius: 999px; font-weight: 600; font-size: 0.9rem; background: #e9ecef; color: #555; }
+        .chip.waiting { background: #fff3cd; color: #856404; }
+        .chip.active { background: #d4edda; color: #155724; }
+        .chip.paused { background: #ffe5b4; color: #8a4b00; }
+        .chip.finished { background: #d1ecf1; color: #0c5460; }
+        .sid { color: #888; font-family: monospace; }
+        header .spacer { flex: 1; }
+        .counts { font-weight: 600; color: #555; }
+
+        .card { background: white; border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.08); padding: 1.25rem; }
+        .btn { border: none; border-radius: 10px; padding: 0.8rem 1.4rem; font-size: 1rem; font-weight: 600; cursor: pointer; color: white;
+               background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn.big { font-size: 1.25rem; padding: 1rem 2rem; }
+        .btn.green { background: linear-gradient(135deg, #28a745 0%, #20c997 100%); }
+        .btn.grey { background: #6c757d; }
+        .btn.orange { background: linear-gradient(135deg, #ffc107 0%, #fd7e14 100%); }
+        .btn.red { background: linear-gradient(135deg, #dc3545 0%, #c82333 100%); }
+        .btn.light { background: #eef0fb; color: #4b55c4; }
+
+        /* ---------- setup (waiting) ---------- */
+        .setup { display: grid; grid-template-columns: minmax(280px, 420px) 1fr; gap: 1.25rem; align-items: start; }
+        .qr-card { text-align: center; }
+        .qr-card img { width: 100%; max-width: 360px; height: auto; image-rendering: pixelated; }
+        .join-url { font-family: monospace; font-size: 1.05rem; background: #f8f9fa; border-radius: 8px; padding: 0.6rem; word-break: break-all; margin: 0.5rem 0; }
+        .steps { text-align: left; color: #555; line-height: 1.7; padding-left: 1.25rem; margin: 0.75rem 0 0; }
+        .lobby h2 { margin: 0 0 0.75rem; }
+        .lobby-list { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 1rem 0; min-height: 3rem; }
+        .lobby-chip { background: #eef0fb; border-radius: 999px; padding: 0.35rem 0.8rem; font-weight: 600; color: #4b55c4; }
+        .lobby-chip.offline { opacity: 0.45; }
+        .empty { color: #888; }
+
+        /* ---------- walk ---------- */
+        .walk { display: grid; grid-template-columns: 1fr 300px; gap: 1rem; align-items: start; }
+        .question-bar { display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; margin-bottom: 1rem; }
+        .question-bar .q { flex: 1; min-width: 260px; }
+        .qnum { color: #667eea; font-weight: 700; }
+        .qtext { font-size: 1.6rem; font-weight: 600; line-height: 1.35; margin-top: 0.25rem; }
+        .progress { margin-top: 0.4rem; color: #666; font-weight: 600; }
+        .timer { font-size: 2rem; font-weight: 700; color: #667eea; min-width: 4ch; text-align: center; }
+        .timer.warn { color: #dc3545; }
+        .controls { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+
+        .grid-wrap { position: relative; height: calc(100vh - 260px); min-height: 420px; border-radius: 10px; overflow: hidden;
+                     border: 2px solid #ddd; background: linear-gradient(to bottom, #e8f5e8 0%, #f0f8f0 50%, #f8e8e8 100%); }
+        .rows { position: absolute; inset: 0; display: flex; flex-direction: column; }
+        .row { flex: 1; display: flex; border-bottom: 1px solid rgba(0,0,0,0.12); }
+        .row.zero { border-bottom: 2px solid rgba(0,0,0,0.35); background: rgba(255,255,255,0.35); }
+        .row .lbl { width: 48px; flex: none; display: flex; align-items: center; justify-content: center; font-size: 0.75rem;
+                    font-weight: 600; color: #666; background: rgba(255,255,255,0.85); border-right: 1px solid rgba(0,0,0,0.2); }
+        .cols { position: absolute; top: 0; bottom: 0; left: 48px; right: 0; pointer-events: none; }
+        .marker { position: absolute; transform: translate(-50%, -50%); z-index: 3; color: white; background: #667eea; border-radius: 8px;
+                  padding: 0.15rem 0.3rem; font-weight: 600; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+                  box-shadow: 0 2px 6px rgba(0,0,0,0.25); transition: top 0.6s ease, left 0.6s ease, background 0.3s ease, opacity 0.3s ease; }
+        .marker.answered { background: #28a745; }
+        .marker.pending { background: #ffc107; color: #333; }
+        .marker.offline { background: #adb5bd; opacity: 0.7; }
+        .grid-empty { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #888; font-size: 1.2rem; z-index: 2; }
+        .legend { display: flex; gap: 1rem; flex-wrap: wrap; font-size: 0.85rem; color: #666; margin-top: 0.5rem; }
+        .legend i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 4px; vertical-align: -1px; }
+
+        .side { display: flex; flex-direction: column; gap: 1rem; }
+        .side h3 { margin: 0 0 0.6rem; font-size: 1rem; }
+        .mini-qr { display: flex; gap: 0.75rem; align-items: center; }
+        .mini-qr img { width: 110px; height: 110px; image-rendering: pixelated; }
+        .mini-qr .join-url { font-size: 0.8rem; }
+
+        .setting { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin: 0.5rem 0; font-size: 0.95rem; }
+        .setting select { padding: 0.35rem; border-radius: 6px; border: 1px solid #ccc; font-size: 0.95rem; }
+        .setting input[type="checkbox"] { width: 20px; height: 20px; }
+        .hint { font-size: 0.8rem; color: #888; line-height: 1.4; }
+        details { margin-top: 0.5rem; font-size: 0.9rem; }
+        details summary { cursor: pointer; color: #667eea; font-weight: 600; }
+
+        .people { max-height: 45vh; overflow-y: auto; }
+        .person { display: flex; align-items: center; gap: 0.5rem; padding: 0.4rem 0.25rem; border-bottom: 1px solid #f0f0f0; font-size: 0.95rem; }
+        .person .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .person .score { font-weight: 700; color: #667eea; min-width: 2.5ch; text-align: right; }
+        .dot { width: 10px; height: 10px; border-radius: 50%; flex: none; background: #ffc107; }
+        .dot.answered { background: #28a745; }
+        .dot.offline { background: #adb5bd; }
+        .dot.idle { background: #667eea; }
+        .remove { background: none; border: none; color: #bbb; cursor: pointer; font-size: 1.1rem; padding: 0 0.25rem; }
+        .remove:hover { color: #dc3545; }
+
+        .results { margin-top: 1rem; }
+        .results h2 { margin-top: 0; }
+        .result-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 0.5rem; margin: 1rem 0; }
+        .result { background: #f8f9fa; border-left: 4px solid #667eea; border-radius: 8px; padding: 0.6rem 0.8rem; }
+        .result b { color: #667eea; margin-right: 0.4rem; }
+
+        @media (max-width: 900px) {
+            .setup, .walk { grid-template-columns: 1fr; }
+            .grid-wrap { height: 70vh; }
         }
     </style>
 </head>
 <body>
-    <div class="header">
-        <h1 class="session-name">🚶‍♂️ Privilege Walk Session</h1>
-        <p class="session-id">Session ID: {{ session_id }}</p>
-        <p class="session-subtitle">Welcome! Scan the QR code below to join this session</p>
-    </div>
-    
+    <div class="banner hidden" id="banner"></div>
 
-    
-    <div class="main-content">
-        <div class="left-panel">
-            <h2>📱 Join This Session</h2>
-            
-            <div class="qr-container">
-                <div class="qr-instructions">
-                    <h3>How to Join:</h3>
-                    <ol>
-                        <li>📱 Scan this QR code with your phone camera</li>
-                        <li>🌐 You'll be taken to a join page</li>
-                        <li>✏️ Enter a unique nickname (at least 2 characters)</li>
-                        <li>⏳ You'll see "Please wait" until the session starts</li>
-                    </ol>
-                </div>
-                
-                <div class="qr-code" id="qrCode">
-                    <img id="qrCodeImage" src="/qr/{{ session_id }}" alt="QR Code for joining session" style="max-width: 300px; height: auto;">
-                    <div class="qr-controls">
-                        <button onclick="refreshQRCode()" class="refresh-btn">🔄 Refresh QR Code</button>
-                    </div>
-                </div>
-                
-                <div class="join-url">
-                    <p><strong>Join URL:</strong></p>
-                    <div class="url-display" id="joinUrl">Loading...</div>
-                    <button class="copy-btn" onclick="copyJoinURL()">📋 Copy URL</button>
-                </div>
-            </div>
-            
-            <div class="session-controls">
-                <button class="start-btn" id="startBtn">🚀 Begin Privilege Walk</button>
-                <button class="stop-btn" id="stopBtn" onclick="stopSession()" style="display: none;">⏹️ End Session</button>
-            </div>
-            
-            <div class="question-display">
-                <h3>Current Question:</h3>
-                <div class="question-text" id="questionDisplay">Session not started yet</div>
-            </div>
+    <header>
+        <h1 id="title">{{ session_name }}</h1>
+        <span class="chip" id="statusChip">Loading...</span>
+        <span class="sid">Session {{ session_id }}</span>
+        <span class="spacer"></span>
+        <span class="counts" id="counts"></span>
+    </header>
+
+    <!-- ===== Setup / lobby ===== -->
+    <section class="setup hidden" id="setupView">
+        <div class="card qr-card">
+            <h2 style="margin-top:0">📱 Scan to join</h2>
+            <img src="/qr/{{ session_id }}" alt="QR code to join this session" id="bigQr">
+            <div class="join-url" id="joinUrl">{{ join_url }}</div>
+            <button class="btn light" onclick="copyText(JOIN_URL, this)">📋 Copy join link</button>
+            <ol class="steps">
+                <li>Scan the QR code with your phone camera</li>
+                <li>Tap <b>Join anonymously</b>. You get a random name like "Teal Fox 🦊"</li>
+                <li>Find your name on this screen once the walk starts</li>
+            </ol>
         </div>
-        
-        <div class="right-panel">
-            <h2>👥 Who's Joined</h2>
-            <div class="user-count-display">
-                <div class="total-users">Total Participants: <span id="totalUserCount">0</span></div>
-                <div id="sessionStatusMessage" style="margin-top: 0.5rem; padding: 0.5rem; background: #d4edda; color: #155724; border-radius: 5px; font-size: 0.9rem;">
-                    ✅ Session is ready - participants can join now!
+        <div class="card lobby">
+            <h2>👥 <span id="lobbyCount">0</span> joined</h2>
+            <div class="lobby-list" id="lobbyList"><span class="empty">Waiting for students to scan the code...</span></div>
+            <button class="btn big green" id="startBtn">🚀 Begin Privilege Walk</button>
+            <p class="hint">Students who join late can still take part from the current question. Students whose phone goes to sleep
+               will not hold up the class: the walk only waits for students who are connected.</p>
+            <div id="settingsHostSetup"></div>
+        </div>
+    </section>
+
+    <!-- ===== Walk ===== -->
+    <section class="walk hidden" id="walkView">
+        <div>
+            <div class="card question-bar">
+                <div class="q">
+                    <div class="qnum" id="qNum"></div>
+                    <div class="qtext" id="qText"></div>
+                    <div class="progress" id="progressText"></div>
                 </div>
-                <button onclick="manualRefresh()" style="margin-top: 0.5rem; padding: 0.5rem 1rem; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer;">🔄 Refresh List</button>
+                <div class="timer" id="timer"></div>
+                <div class="controls" id="walkControls">
+                    <button class="btn grey" id="backBtn">⬅ Back</button>
+                    <button class="btn orange" id="pauseBtn">⏸ Pause</button>
+                    <button class="btn green" id="nextBtn">Next ➡</button>
+                </div>
+                <div class="controls hidden" id="finishedControls">
+                    <button class="btn grey" id="reopenBtn">⬅ Reopen last question</button>
+                </div>
+            </div>
+            <div class="grid-wrap" id="gridWrap">
+                <div class="rows" id="rows"></div>
+                <div class="cols" id="cols"></div>
+                <div class="grid-empty hidden" id="gridEmpty">No participants yet</div>
+            </div>
+            <div class="legend">
+                <span><i style="background:#28a745"></i>Answered</span>
+                <span><i style="background:#ffc107"></i>Still answering</span>
+                <span><i style="background:#adb5bd"></i>Disconnected (not waited for)</span>
+                <span>Top = agreed more often, bottom = disagreed more often</span>
             </div>
 
-            <div class="user-list" id="userList">
-                <p style="text-align: center; color: #666;">No participants have joined yet</p>
-            </div>
-            
-            <!-- Participant display during questions -->
-            <div class="participant-display" id="participantDisplay" style="display: none;">
-                <h3>👥 Current Participants & Scores</h3>
-                <div class="participant-list" id="participantList">
-                    <!-- Participants will be displayed here during questions -->
+            <div class="card results hidden" id="resultsView">
+                <h2>🏁 Final positions</h2>
+                <div class="result-list" id="resultList"></div>
+                <div class="controls">
+                    <a class="btn light" href="/api/h/{{ session_id }}/export.csv" style="text-decoration:none">⬇ Download results (CSV)</a>
+                    <button class="btn orange" id="resetBtn">🔄 Run again with the same students</button>
+                    <a class="btn green" href="/" target="_blank" style="text-decoration:none">🆕 New session</a>
                 </div>
             </div>
         </div>
-    </div>
-    
-    <div class="privilege-walk-view" id="privilegeWalkView">
-        <div class="walk-header">
-            <h2>🚶‍♂️ Privilege Walk in Progress</h2>
-            <button onclick="showMainView()" class="back-btn">← Back to Setup</button>
-        </div>
-        
 
-        
-        <div class="question-display" id="questionDisplay">
-            <div class="question-text" id="questionText"></div>
-            <div class="question-progress" id="questionProgress"></div>
-        </div>
-        
-        <div class="walk-container" id="walkContainer">
-            <div class="walk-grid" id="walkGrid">
-                <!-- Grid will be generated dynamically -->
+        <div class="side">
+            <div class="card">
+                <h3>Join late / reconnect</h3>
+                <div class="mini-qr">
+                    <img src="/qr/{{ session_id }}" alt="QR code to join">
+                    <div class="join-url">{{ join_url }}</div>
+                </div>
             </div>
-            <!-- User markers will be dynamically added here -->
-        </div>
-        
-        <!-- Question Progress Control Bar -->
-        <div class="question-progress-control-bar" id="questionProgressControlBar" style="display: none;">
-            <div class="question-info">
-                <div class="question-text-display" id="questionTextDisplay"></div>
-                <div class="question-stats" id="questionStats"></div>
-            </div>
-            <div class="question-controls">
-                <button class="question-nav-btn" id="prevQuestionBtn" style="display: none;" onclick="goToPreviousQuestion()">
-                    ⬅️ Previous
-                </button>
-                <button class="question-nav-btn" id="nextQuestionBtn" style="display: none;" onclick="advanceToNextQuestion()">
-                    ➡️ Next
-                </button>
+            <div class="card" id="settingsHostWalk"></div>
+            <div class="card">
+                <h3>Participants</h3>
+                <div class="people" id="people"></div>
+                <p class="hint">Remove ghost entries (for example someone who joined twice) with ✕.</p>
             </div>
         </div>
-    </div>
-    
-    <div class="final-results" id="finalResults">
-        <h2>🏁 Final Results</h2>
-        <div class="final-positions" id="finalPositions">
-            <!-- Final positions will be displayed here -->
+    </section>
+
+    <!-- Settings block, moved between setup and walk views -->
+    <div id="settings">
+        <h3>Settings</h3>
+        <div class="setting">
+            <label for="timerSelect">Time per question</label>
+            <select id="timerSelect">
+                {% for t in timer_choices %}<option value="{{ t }}">{{ 'No limit' if t == 0 else (t|string) + ' seconds' }}</option>{% endfor %}
+            </select>
         </div>
-        
-        <div class="session-actions">
-            <h3>🔄 What would you like to do next?</h3>
-            <div class="action-buttons">
-                <button onclick="resetSession()" class="action-btn reset-btn">
-                    🔄 Reset Session (Same Students, New Questions)
-                </button>
-                <button onclick="createNewSession()" class="action-btn new-btn">
-                    🆕 Create New Session (Fresh Start)
-                </button>
-                <button onclick="showMainView()" class="action-btn back-btn">
-                    ← Back to Setup
-                </button>
-            </div>
+        <div class="setting">
+            <label for="autoAdvance">Move on when everyone connected has answered</label>
+            <input type="checkbox" id="autoAdvance">
         </div>
+        <div class="setting">
+            <label for="stragglerSelect">Once 3 in 4 have answered, wait at most</label>
+            <select id="stragglerSelect">
+                {% for t in straggler_choices %}<option value="{{ t }}">{{ 'Wait for all' if t == 0 else (t|string) + ' seconds' }}</option>{% endfor %}
+            </select>
+        </div>
+        <div class="setting">
+            <label for="joiningOpen">Allow new students to join</label>
+            <input type="checkbox" id="joiningOpen">
+        </div>
+        <p class="hint">"Next" always works, even if some students have not answered. Unanswered questions count as no step.</p>
+        <details>
+            <summary>Teacher link (keep private)</summary>
+            <p class="hint">Open this link on another device to control this session (for example if your laptop restarts). Do not show it to students.</p>
+            <button class="btn light" onclick="copyText(TEACHER_URL, this)">📋 Copy teacher link</button>
+        </details>
     </div>
 
+    <script src="/static/common.js"></script>
     <script>
-        const sessionId = '{{ session_id }}';
-        const networkIp = '{{ network_ip }}';
-        
-        let currentQuestion = 0;
-        let totalQuestions = 0;
-        let questionText = '';
-        let users = {};
-        let userAnswers = {};
-        let userCount = 0;
-        let pollInterval = null;
-        let positionsLoaded = false; // Flag to track if positions have been loaded
-        let lastKnownPositions = {}; // Store last known positions to detect changes
-        let lastKnownQuestion = 0; // Store last known question to detect changes
-        let gridCreated = false; // Flag to track if grid has been created
+        const sessionId = {{ session_id | tojson }};
+        const HOST_KEY = {{ host_key | tojson }};
+        const JOIN_URL = {{ join_url | tojson }};
+        const TEACHER_URL = `${location.origin}/instructor/${sessionId}?key=${encodeURIComponent(HOST_KEY)}`;
+        const HEADERS = { 'X-Host-Key': HOST_KEY };
 
-        function startPolling() {
-            // Poll every 2 seconds for updates
-            pollInterval = setInterval(async () => {
-                try {
-                    const response = await fetch(`/api/session_status/${sessionId}`);
-                    if (response.ok) {
-                        const data = await response.json();
-                        await handleStatusUpdate(data);
-                        
-                        // If session is active, DO NOT update positions during regular polling
-                        // This prevents the flashing effect - positions only update on real score changes
-                        if (data.status === 'active') {
-                            // Positions are updated separately when there are actual score changes
-                            // Not during regular status polling to prevent flashing
-                            console.log('Session active - positions stable during polling');
-                        }
-                    }
-                } catch (error) {
-                    console.error('Polling error:', error);
-                }
-            }, 2000);
-        }
+        let state = null;
+        let lastOkAt = Date.now();
+        let busy = false;
+        let localTimeLeft = null;
+        let gridKey = '';
+        const markers = {};    // pid -> element
+        const $ = (id) => document.getElementById(id);
 
-        async function handleStatusUpdate(data) {
-            console.log('Status update received:', data);
-            console.log('Previous user count:', userCount, 'Previous users:', users);
-            
-            // Update user count and list FIRST (regardless of status)
-            const newUserCount = data.user_count || 0;
-            const newUsers = data.users || [];
-            
-            console.log('New user count:', newUserCount, 'New users:', newUsers);
-            
-            // Only update if there are actual changes
-            if (newUserCount !== userCount || JSON.stringify(newUsers) !== JSON.stringify(users)) {
-                userCount = newUserCount;
-                users = newUsers;
-                
-                console.log('User data changed, updating display...');
-                
-                // Update user count display
-                const userCountDisplay = document.getElementById('totalUserCount');
-                if (userCountDisplay) {
-                    userCountDisplay.textContent = userCount;
-                }
-                
-                // Update user list
-                updateUserList();
-                
-                // Update participant display
-                updateParticipantDisplay();
+        // Remember this session on this device so the home page can link back to it.
+        (function rememberSession() {
+            const list = PW.store.get('pw:recent') || [];
+            if (!list.some(r => r.id === sessionId)) {
+                list.unshift({ id: sessionId, key: HOST_KEY, name: $('title').textContent, created: Date.now() });
+                PW.store.set('pw:recent', list.slice(0, 10));
             }
-            
-            // Then handle session status changes
-            if (data.status === 'waiting') {
-                showMainView();
-                // Even in waiting status, we want to show users who have joined
-                console.log('Session is waiting, but users can still join');
-            } else if (data.status === 'active') {
-                await showPrivilegeWalkView();
-                updateQuestionProgress();
-                loadUserPositions();
-                loadUserAnswers();
-            } else if (data.status === 'finished') {
-                showFinalView();
-            }
-            
-            // Update the session status message
-            updateSessionStatusMessage(data.status);
-            
-            // Update participant display after status change
-            updateParticipantDisplay();
-        }
+        })();
 
-        async function loadCurrentQuestion() {
-            try {
-                const response = await fetch(`/api/session_status/${sessionId}`);
-                if (response.ok) {
-                    const data = await response.json();
-                    currentQuestion = data.current_question;
-                    totalQuestions = data.total_questions;
-                    
-                    // Set global variable for grid sizing
-                    window.totalQuestions = totalQuestions;
-                    
-                    // Always try to get the current question text, regardless of status
-                    if (currentQuestion < totalQuestions) {
-                        const questionResponse = await fetch(`/api/question/${sessionId}`);
-                        if (questionResponse.ok) {
-                            const questionData = await questionResponse.json();
-                            questionText = questionData.question;
-                            
-                            // Update question display using the proper function
-                            updateQuestionDisplay(questionText, currentQuestion + 1, totalQuestions);
-                        }
-                    } else {
-                        // No more questions, clear the display
-                        updateQuestionDisplay('Session completed - no more questions', totalQuestions, totalQuestions);
-                    }
-                    
-                    // Update question progress
-                    updateQuestionProgress();
-                    
-                    // Update participant display when question changes
-                    updateParticipantDisplay();
-                }
-            } catch (error) {
-                console.error('Error loading current question:', error);
-            }
-        }
+        function banner(text) { $('banner').textContent = text || ''; $('banner').classList.toggle('hidden', !text); }
 
-        async function loadUserPositions() {
-            try {
-                const response = await fetch(`/api/positions/${sessionId}`);
-                if (response.ok) {
-                    const data = await response.json();
-                    updateUserPositions(data.positions);
-                    
-                    // Update participant scores in the display
-                    if (data.positions) {
-                        Object.keys(data.positions).forEach(username => {
-                            const scoreElement = document.getElementById(`score-${username}`);
-                            if (scoreElement) {
-                                scoreElement.textContent = data.positions[username];
-                            }
-                        });
-                    }
-                    
-                    // Store current positions for change detection
-                    lastKnownPositions = { ...data.positions };
-                    
-                    // Mark positions as loaded
-                    positionsLoaded = true;
-                }
-            } catch (error) {
-                console.error('Error loading positions:', error);
-            }
-        }
-
-        async function loadUserAnswers() {
-            try {
-                // Get current user answer status from the dedicated endpoint
-                const response = await fetch(`/api/user_answers/${sessionId}`);
-                if (response.ok) {
-                    const data = await response.json();
-                    
-                    // Update user answers based on the API response
-                    userAnswers = {};
-                    if (data.user_answers) {
-                        Object.keys(data.user_answers).forEach(username => {
-                            userAnswers[username] = data.user_answers[username].answered;
-                        });
-                    }
-                    
-                    updateUserAnswerStatus(data);
-                }
-            } catch (error) {
-                console.error('Error loading user answers:', error);
-            }
-        }
-
-        async function loadUserCount() {
-            try {
-                console.log('loadUserCount called, fetching session status...');
-                const response = await fetch(`/api/session_status/${sessionId}`);
-                if (response.ok) {
-                    const data = await response.json();
-                    console.log('loadUserCount received data:', data);
-                    
-                    userCount = data.user_count;
-                    users = data.users;
-                    
-                    console.log('Updated userCount to:', userCount, 'and users to:', users);
-                    
-                    // Update user count display
-                    const userCountDisplay = document.getElementById('totalUserCount');
-                    if (userCountDisplay) {
-                        userCountDisplay.textContent = userCount;
-                        console.log('Updated user count display to:', userCount);
-                    } else {
-                        console.error('totalUserCount element not found!');
-                    }
-                    
-                    // Update user list
-                    updateUserList();
-                } else {
-                    console.error('loadUserCount failed with status:', response.status);
-                }
-            } catch (error) {
-                console.error('Error loading user count:', error);
-            }
-        }
-        
-        function updateUserList() {
-            console.log('updateUserList called with userCount:', userCount, 'users:', users);
-            
-            const userList = document.getElementById('userList');
-            if (userList) {
-                if (userCount === 0) {
-                    console.log('No users, showing "No participants joined yet" message');
-                    userList.innerHTML = '<p style="text-align: center; color: #666;">No participants have joined yet</p>';
-                } else {
-                    console.log('Building user list HTML for', userCount, 'users');
-                    let userListHTML = '';
-                    
-                    // Ensure users is an array
-                    const userArray = Array.isArray(users) ? users : Object.keys(users);
-                    
-                    for (const username of userArray) {
-                        const hasAnswered = userAnswers[username] || false;
-                        const statusClass = hasAnswered ? 'answered' : 'pending';
-                        const statusIcon = hasAnswered ? '✅' : '⏳';
-                        const statusText = hasAnswered ? 'Answered' : 'Pending';
-                        
-                        userListHTML += `
-                            <div class="user-item ${statusClass}">
-                                <span class="user-icon">👤</span>
-                                <span class="username">${username}</span>
-                                <span class="status">${statusIcon} ${statusText}</span>
-                            </div>
-                        `;
-                    }
-                    console.log('Setting user list HTML:', userListHTML);
-                    userList.innerHTML = userListHTML;
-                    
-                    // Also update participant display
-                    updateParticipantDisplay();
-                    
-
-                }
+        function copyText(text, btn) {
+            const done = () => { const old = btn.textContent; btn.textContent = '✓ Copied'; setTimeout(() => btn.textContent = old, 1500); };
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(text).then(done, () => fallbackCopy(text, done));
             } else {
-                console.error('userList element not found!');
+                fallbackCopy(text, done);
             }
         }
+        function fallbackCopy(text, done) {
+            const ta = document.createElement('textarea');
+            ta.value = text; document.body.appendChild(ta); ta.select();
+            try { document.execCommand('copy'); done(); } catch (e) { prompt('Copy this:', text); }
+            document.body.removeChild(ta);
+        }
 
-        function updateUserAnswerStatus(data) {
-            // Initialize user answers for current question
-            Object.keys(users).forEach(username => {
-                if (!(username in userAnswers)) {
-                    userAnswers[username] = false;
-                }
-            });
-            
-            // Check if we need to update answer status based on question progress
-            if (data.current_question !== undefined && data.current_question !== currentQuestion) {
-                // New question started, reset all answers
-                Object.keys(userAnswers).forEach(username => {
-                    userAnswers[username] = false;
-                });
+        // ---------- polling ----------
+        async function poll() {
+            const r = await PW.api(`/api/h/${sessionId}/state`, { headers: HEADERS });
+            if (r.status === 404) { banner('This session no longer exists (it may have expired). Create a new one from the home page.'); return true; }
+            if (r.status === 403) { banner('Teacher access was lost for this session. Open your teacher link again.'); return true; }
+            if (!r.ok) {
+                if (Date.now() - lastOkAt > 4000) banner('Connection to the server lost. Retrying... (students\' answers are kept on the server)');
+                return false;
             }
-            
-            // Update question progress display
-            updateQuestionProgress();
-            updateUserList();
-            
-            // Update participant display to show current answer status
-            updateParticipantDisplay();
-            
-            // Update marker colors based on answer status
-            updateMarkerColors();
-            
-            // Only update positions when there are actual score changes, not on every status update
-        }
-        
-        function updateMarkerColors() {
-            console.log('=== UPDATING MARKER COLORS ===');
-            console.log('Current userAnswers:', userAnswers);
-            
-            // Update each user marker's color based on their answer status
-            Object.keys(userAnswers).forEach(username => {
-                const marker = document.getElementById(`marker-${username}`);
-                if (marker) {
-                    const hasAnswered = userAnswers[username] || false;
-                    
-                    // Remove existing status classes
-                    marker.classList.remove('answered', 'pending');
-                    
-                    // Add appropriate status class
-                    if (hasAnswered) {
-                        marker.classList.add('answered');
-                        console.log(`✅ ${username}: Green (answered)`);
-                    } else {
-                        marker.classList.add('pending');
-                        console.log(`⏳ ${username}: Orange (pending)`);
-                    }
-                } else {
-                    console.warn(`Marker not found for user: ${username}`);
-                }
-            });
-            
-            console.log('=== MARKER COLORS UPDATED ===');
-            // This prevents the flashing effect during regular polling
-            // Positions will be updated separately when scores actually change
+            lastOkAt = Date.now();
+            banner('');
+            state = r.data;
+            render();
+            return true;
         }
 
-        function updateQuestionProgress() {
-            const questionProgressControlBar = document.getElementById('questionProgressControlBar');
-            const questionTextDisplay = document.getElementById('questionTextDisplay');
-            const questionStats = document.getElementById('questionStats');
-            const nextQuestionBtn = document.getElementById('nextQuestionBtn');
-            const prevQuestionBtn = document.getElementById('prevQuestionBtn');
-            
-            if (questionProgressControlBar && questionTextDisplay && questionStats) {
-                questionProgressControlBar.style.display = 'flex';
-                questionTextDisplay.textContent = `Question ${currentQuestion + 1} of ${totalQuestions}: ${questionText}`;
-                
-                // Count answered vs pending users
-                const answeredCount = Object.values(userAnswers).filter(answered => answered).length;
-                const totalUsers = Object.keys(users).length;
-                const pendingCount = totalUsers - answeredCount;
-                
-                let statsText = `✅ Answered: ${answeredCount}/${totalUsers} | ⏳ Pending: ${pendingCount}/${totalUsers}`;
-                
-                // Update user list to reflect current answer status
-                updateUserList();
-                
-                // Update participant display to show current answer status
-                updateParticipantDisplay();
-
-                // Show/hide previous question button
-                if (currentQuestion > 0) {
-                    prevQuestionBtn.style.display = 'block';
-                } else {
-                    prevQuestionBtn.style.display = 'none';
-                }
-
-                // Show/hide next question button
-                if (currentQuestion < totalQuestions - 1) {
-                    // Check if all users have answered the current question
-                    if (answeredCount === totalUsers && totalUsers > 0) {
-                        statsText += ` | 🎉 All users have answered! Ready for next question.`;
-                        nextQuestionBtn.style.display = 'block';
-                        nextQuestionBtn.textContent = '➡️ Next';
-                        
-                        // All users answered - this triggers score changes, so update positions
-                        console.log('All users answered - updating positions due to score changes');
-                        loadUserPositions();
-                    } else {
-                        // Show manual override button even when not all users answered
-                        nextQuestionBtn.style.display = 'block';
-                        nextQuestionBtn.textContent = `➡️ Next (${pendingCount} pending)`;
-                        
-                        // Add warning about pending users
-                        if (pendingCount > 0) {
-                            statsText += ` | ⚠️ ${pendingCount} user(s) haven't answered yet. You can manually advance if needed.`;
-                        }
-                    }
-                } else {
-                    // Last question - hide next button
-                    nextQuestionBtn.style.display = 'none';
-                }
-                
-                questionStats.textContent = statsText;
+        async function action(name, body) {
+            if (busy) return;
+            busy = true;
+            setControlsDisabled(true);
+            let r = null;
+            for (let attempt = 0; attempt < 3; attempt++) {
+                r = await PW.api(`/api/h/${sessionId}/${name}`, { method: 'POST', headers: HEADERS, body: body || {} });
+                if (r.ok || (!r.network && r.status < 500)) break;
+                await new Promise(res => setTimeout(res, 1000));
             }
+            busy = false;
+            setControlsDisabled(false);
+            if (!r.ok) alert(r.data.error || 'Could not reach the server. Please try again.');
+            await poll();
         }
 
-        async function loadFinalResults() {
-            try {
-                const response = await fetch(`/api/positions/${sessionId}`);
-                if (response.ok) {
-                    const data = await response.json();
-                    showFinalResults(data.positions);
-                }
-            } catch (error) {
-                console.error('Error loading final results:', error);
-            }
+        function setControlsDisabled(disabled) {
+            ['startBtn', 'backBtn', 'pauseBtn', 'nextBtn', 'reopenBtn', 'resetBtn'].forEach(id => { if ($(id)) $(id).disabled = disabled; });
+            if (!disabled && state) render();
         }
 
-        function updateStatus() {
-            const statusElement = document.getElementById('status');
-            if (statusElement) {
-                if (sessionStatus === 'waiting') {
-                    statusElement.textContent = 'Waiting for students to join...';
-                    statusElement.className = 'status waiting';
-                } else if (sessionStatus === 'active') {
-                    statusElement.textContent = 'Privilege Walk in progress...';
-                    statusElement.className = 'status active';
-                } else if (sessionStatus === 'finished') {
-                    statusElement.textContent = 'Session finished!';
-                    statusElement.className = 'status finished';
-                }
-            }
-        }
+        // ---------- rendering ----------
+        function render() {
+            const s = state;
+            const paused = s.status === 'active' && s.paused;
+            const chip = $('statusChip');
+            chip.className = 'chip ' + (paused ? 'paused' : s.status);
+            chip.textContent = paused ? 'Paused' : ({ waiting: 'Waiting to start', active: 'Walk in progress', finished: 'Finished' })[s.status];
+            if (s.name) { $('title').textContent = s.name; document.title = `${s.name} - Privilege Walk (Teacher)`; }
+            const c = s.counts;
+            $('counts').textContent = `👥 ${c.total} joined · 🟢 ${c.connected} connected`;
 
-        function updateUserCount() {
-            const userCountElement = document.getElementById('userCount');
-            if (userCountElement) {
-                userCountElement.textContent = Object.keys(users).length;
-            }
-        }
-
-        function updateGoButton() {
-            const goButton = document.getElementById('goButton');
-            if (goButton) {
-                goButton.disabled = Object.keys(users).length === 0;
-            }
-        }
-
-        function showMainView() {
-            document.querySelector('.main-content').style.display = 'flex';
-            document.getElementById('privilegeWalkView').style.display = 'none';
-            document.getElementById('finalResults').style.display = 'none';
-            
-            // Hide participant display when showing main view
-            const participantDisplay = document.getElementById('participantDisplay');
-            if (participantDisplay) {
-                participantDisplay.style.display = 'none';
-            }
-            
-            // If session is active, show question progress and next question button
-            if (currentQuestion >= 0 && totalQuestions > 0) {
-                updateQuestionProgress();
-            }
-        }
-
-        async function showPrivilegeWalkView() {
-            // Keep main content visible so instructor can see question progress and navigation buttons
-            document.querySelector('.main-content').style.display = 'flex';
-            document.getElementById('privilegeWalkView').style.display = 'block';
-            document.getElementById('finalResults').style.display = 'none';
-            
-            // Load current question data first to set window.totalQuestions
-            await loadCurrentQuestion();
-            
-            // Create the walk grid once when the privilege walk starts
-            createWalkGrid();
-            
-            // Create user markers positioned on the grid (now async)
-            await createUserMarkers();
-            
-            // Update participant display when showing privilege walk view
-            updateParticipantDisplay();
-        }
-
-        async function resetSession() {
-            // Reset the current session for new questions
-            if (confirm('Reset this session? Students will keep their usernames but start fresh questions.')) {
-                try {
-                    const response = await fetch('/api/reset_session', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({ session_id: sessionId })
-                    });
-                    
-                    const data = await response.json();
-                    if (data.success) {
-                        // Hide final results
-                        document.getElementById('finalResults').style.display = 'none';
-                        // Show privilege walk view again
-                        await showPrivilegeWalkView();
-                        // Reset session state
-                        sessionStatus = 'waiting';
-                        updateStatus();
-                        // Clear previous results
-                        document.getElementById('walkContainer').innerHTML = '';
-                        // Reset positions loaded flag
-                        positionsLoaded = false;
-                        // Reset grid created flag
-                        gridCreated = false;
-                        // Re-enable go button
-                        document.getElementById('goButton').disabled = false;
-                    }
-                } catch (error) {
-                    console.error('Error resetting session:', error);
-                    alert('Error resetting session');
-                }
-            }
-        }
-
-        function showFinalResults(finalPositions) {
-            const finalResults = document.getElementById('finalResults');
-            const finalPositionsDiv = document.getElementById('finalPositions');
-            
-            // Sort by position (highest first)
-            const sortedPositions = Object.entries(finalPositions)
-                .sort(([,a], [,b]) => b - a);
-            
-            finalPositionsDiv.innerHTML = sortedPositions.map(([username, position], index) => `
-                <div class="position-card">
-                    <div class="position-rank">#${index + 1}</div>
-                    <div class="position-name">${username}</div>
-                    <div class="position-value">Position: ${position.toFixed(1)}</div>
-                </div>
-            `).join('');
-            
-            finalResults.style.display = 'block';
-        }
-
-        function updateQuestionDisplay(question, questionNumber, totalQuestions) {
-            const questionText = document.getElementById('questionText');
-            const questionProgress = document.getElementById('questionProgress');
-            
-            if (questionText) questionText.textContent = question;
-            if (questionProgress) questionProgress.textContent = `Question ${questionNumber} of ${totalQuestions}`;
-        }
-
-        async function createUserMarkers() {
-            const container = document.getElementById('walkContainer');
-            
-            console.log('=== MARKER CREATION START ===');
-            console.log('Current users object:', users);
-            console.log('Users type:', typeof users);
-            console.log('Users is array:', Array.isArray(users));
-            
-            // Clear existing markers
-            const existingMarkers = container.querySelectorAll('.user-marker');
-            console.log(`Found ${existingMarkers.length} existing markers, removing them...`);
-            existingMarkers.forEach(marker => {
-                console.log('Removing marker:', marker.textContent);
-                marker.remove();
-            });
-            
-            // Ensure users is an array
-            const userArray = Array.isArray(users) ? users : Object.keys(users);
-            const userCount = userArray.length;
-            
-            console.log(`User array: [${userArray.join(', ')}]`);
-            console.log(`User count: ${userCount}`);
-            
-            if (userCount === 0) {
-                console.log('No users, skipping marker creation');
-                return;
-            }
-            
-            // Check if we're in test mode (test users are arrays, real users are objects)
-            const isTestMode = Array.isArray(users);
-            
-            let positions = {};
-            
-            if (isTestMode) {
-                // Use last known positions for test users
-                positions = lastKnownPositions || {};
-                console.log('Test mode detected, using last known positions:', positions);
+            renderSettings();
+            if (s.status === 'waiting') {
+                $('setupView').classList.remove('hidden');
+                $('walkView').classList.add('hidden');
+                $('settingsHostSetup').appendChild($('settings'));
+                renderLobby();
             } else {
-                // Get current positions from server for real users
-                try {
-                    const response = await fetch(`/api/positions/${sessionId}`);
-                    if (response.ok) {
-                        const data = await response.json();
-                        positions = data.positions || {};
-                    }
-                } catch (error) {
-                    console.error('Failed to fetch positions:', error);
-                }
+                $('setupView').classList.add('hidden');
+                $('walkView').classList.remove('hidden');
+                $('settingsHostWalk').appendChild($('settings'));
+                renderWalk();
             }
-            
-            // Create markers positioned correctly from the start
-            userArray.forEach((username, index) => {
-                const marker = document.createElement('div');
-                marker.className = 'user-marker';
-                marker.id = `marker-${username}`;
-                marker.textContent = username;
-                
-                // Position marker based on current score
-                if (positions[username] !== undefined) {
-                    const walkContainer = document.getElementById('walkContainer');
-                    const containerWidth = walkContainer.offsetWidth;
-                    
-                    // Calculate horizontal position (column center)
-                    const labelColumnWidth = 80;
-                    const dataColumnWidth = (containerWidth - labelColumnWidth) / userCount;
-                    const leftPosition = labelColumnWidth + (index + 0.5) * dataColumnWidth;
-                    
-                    // Calculate vertical position based on score
-                    const score = positions[username];
-                    const totalQuestions = window.totalQuestions || 12;
-                    const maxScore = totalQuestions;
-                    const minScore = -totalQuestions;
-                    const totalRows = (2 * totalQuestions) + 1;
-                    const rowIndex = maxScore - score;
-                    const topPosition = ((rowIndex + 0.5) / totalRows) * 100;
-                    
-                    console.log(`Positioning ${username}: column ${index}, left=${leftPosition}px, score=${score}, top=${topPosition}%`);
-                    
-                    marker.style.left = `${leftPosition}px`;
-                    marker.style.top = `${topPosition}%`;
-                } else {
-                    // Fallback to center if no position data yet
-                    marker.style.left = '50%';
-                    marker.style.top = '50%';
-                }
-                
-                // Set initial answer status - always start as pending for new questions
-                // This ensures markers are yellow when a new question starts
-                const hasAnswered = userAnswers[username] || false;
-                marker.classList.add(hasAnswered ? 'answered' : 'pending');
-                
-                container.appendChild(marker);
+        }
+
+        function renderSettings() {
+            const st = state.settings;
+            // Don't fight the teacher while they are using a control.
+            [['timerSelect', st.timer], ['stragglerSelect', st.straggler_wait]].forEach(([id, value]) => {
+                const sel = $(id);
+                if (document.activeElement === sel) return;
+                if (![...sel.options].some(o => +o.value === value)) sel.appendChild(new Option(`${value} seconds`, value));
+                sel.value = String(value);
             });
-            
-            // Update marker colors after creating all markers
-            updateMarkerColors();
+            $('stragglerSelect').disabled = !st.auto_advance;
+            $('autoAdvance').checked = !!st.auto_advance;
+            $('joiningOpen').checked = !!st.joining_open;
         }
-        
-        function createWalkGrid() {
-            const walkGrid = document.getElementById('walkGrid');
-            const walkContainer = document.getElementById('walkContainer');
-            
-            console.log('=== GRID CREATION START ===');
-            console.log('Current users:', users);
-            console.log('Current totalQuestions:', window.totalQuestions);
-            
-            // Ensure users is an array
-            const userArray = Array.isArray(users) ? users : Object.keys(users);
-            if (userArray.length === 0) {
-                console.log('No users, skipping grid creation');
-                return;
+
+        function renderLobby() {
+            const list = $('lobbyList');
+            $('lobbyCount').textContent = state.participants.length;
+            list.innerHTML = '';
+            if (!state.participants.length) {
+                list.appendChild(PW.el('span', 'empty', 'Waiting for students to scan the code...'));
             }
-            
-            // Get the total number of questions for dynamic grid sizing
-            const totalQuestions = window.totalQuestions || 12; // Fallback to 12 if not set
-            const maxScore = totalQuestions;
-            const minScore = -totalQuestions;
-            const totalRows = (2 * totalQuestions) + 1; // 2 * questions + 1 to include 0
-            
-            console.log(`Grid dimensions: ${totalRows} rows (scores ${minScore} to ${maxScore}), ${userArray.length} columns`);
-            console.log(`Calculation: 2 * ${totalQuestions} + 1 = ${totalRows} rows`);
-            console.log(`Score range: ${minScore} to ${maxScore} (should be -${totalQuestions} to +${totalQuestions})`);
-            
-            // COMPLETELY CLEAR everything first
-            walkGrid.innerHTML = '';
-            
-            // Remove ALL existing labels from the container
-            const allLabels = walkContainer.querySelectorAll('.grid-row-label');
-            allLabels.forEach(label => {
-                label.remove();
-                console.log('Removed row label:', label.textContent);
-            });
-            
-            // Set the CSS grid template rows and columns dynamically
-            // Add one extra column for labels (first column)
-            walkGrid.style.gridTemplateRows = `repeat(${totalRows}, 1fr)`;
-            walkGrid.style.gridTemplateColumns = `80px repeat(${userArray.length}, 1fr)`;
-            
-            // Create grid cells including label column
-            for (let row = 0; row < totalRows; row++) {
-                // First column: labels
-                const labelCell = document.createElement('div');
-                labelCell.className = 'grid-label-cell';
-                // Fix the order: maxScore at top (row 0), minScore at bottom (last row)
-                const score = maxScore - row; // From maxScore to minScore (top to bottom)
-                labelCell.textContent = score;
-                walkGrid.appendChild(labelCell);
-                
-                // Remaining columns: data cells
-                for (let col = 0; col < userArray.length; col++) {
-                    const cell = document.createElement('div');
-                    cell.className = 'grid-cell';
-                    walkGrid.appendChild(cell);
-                }
-            }
-            
-            // Column labels removed - user markers already show usernames and move with scores
-            // No need for duplicate username displays
-            
-            // Mark grid as created
-            gridCreated = true;
-            console.log('=== GRID CREATION COMPLETE ===');
-            console.log(`Final grid: ${totalRows} rows, ${userArray.length + 1} columns (1 label + ${userArray.length} data)`);
-            console.log(`Label cells created: ${walkContainer.querySelectorAll('.grid-label-cell').length}`);
-            console.log(`Data cells created: ${walkContainer.querySelectorAll('.grid-cell').length}`);
-            
-        }
-
-        function updateUserPositions(positions) {
-            if (!positions) return;
-            
-            const walkContainer = document.getElementById('walkContainer');
-            const containerWidth = walkContainer.offsetWidth;
-            const containerHeight = walkContainer.offsetHeight;
-            
-            
-            // Ensure users is an array
-            const userArray = Array.isArray(users) ? users : Object.keys(users);
-            const userCount = userArray.length;
-            
-            if (userCount === 0) return;
-            
-            const columnWidth = containerWidth / userCount;
-            
-            Object.keys(positions).forEach(username => {
-                const marker = document.getElementById(`marker-${username}`);
-                if (marker) {
-                    // Find user's column index
-                    const userIndex = userArray.indexOf(username);
-                    if (userIndex === -1) return;
-                    
-                    
-                    // Calculate horizontal position (column center)
-                    // Account for the label column (80px) and the user's column position
-                    const labelColumnWidth = 80;
-                    const dataColumnWidth = (containerWidth - labelColumnWidth) / userCount;
-                    const leftPosition = labelColumnWidth + (userIndex + 0.5) * dataColumnWidth;
-                    
-                    // Calculate vertical position based on score
-                    // Score ranges from -totalQuestions to +totalQuestions, convert to 0-100%
-                    // maxScore should be at top (0%), minScore should be at bottom (100%)
-                    const score = positions[username];
-                    const totalQuestions = window.totalQuestions || 12; // Fallback to 12 if not set
-                    const maxScore = totalQuestions;
-                    const minScore = -totalQuestions;
-                    const totalRows = (2 * totalQuestions) + 1;
-                    // Convert score to row index: maxScore - score (since grid is now maxScore at top)
-                    const rowIndex = maxScore - score;
-                    // Position at the center of the corresponding row
-                    const topPosition = ((rowIndex + 0.5) / totalRows) * 100;
-                    
-                    // Position marker on the grid
-                    marker.style.left = `${leftPosition}px`;
-                    marker.style.top = `${topPosition}%`;
-                    
-                    // Update answer status
-                    const hasAnswered = userAnswers[username] || false;
-                    marker.classList.remove('answered', 'pending');
-                    marker.classList.add(hasAnswered ? 'answered' : 'pending');
-                }
-            });
-            
-            // Store current positions for change detection
-            lastKnownPositions = { ...positions };
-            
-            // Update user list to reflect answer status
-            updateUserList();
-        }
-
-        function createNewSession() {
-            // Create a completely new session
-            if (confirm('Create a new session? This will generate a new QR code and session ID.')) {
-                window.location.href = '/';
-            }
-        }
-
-        async function testViewTransition() {
-            console.log('=== TESTING VIEW TRANSITION ===');
-            console.log('Current session status:', sessionStatus);
-            console.log('Current users:', users);
-            
-            // Test the transition manually
-            await showPrivilegeWalkView();
-            
-            // After 3 seconds, go back
-            setTimeout(() => {
-                console.log('Going back to main view...');
-                showMainView();
-            }, 3000);
-        }
-
-        // Function to refresh QR code
-        function refreshQRCode() {
-            const qrImage = document.getElementById('qrCodeImage');
-            const timestamp = new Date().getTime();
-            qrImage.src = `/qr/{{ session_id }}?t=${timestamp}`;
-        }
-
-        // Function to refresh IP address display
-        function refreshIPAddress() {
-            // Reload the page to get updated IP address
-            window.location.reload();
-        }
-
-        // Function to copy join URL to clipboard
-        function copyJoinURL() {
-            const joinUrlElement = document.getElementById('joinUrl');
-            const joinURL = joinUrlElement ? joinUrlElement.textContent : `{{ base_url }}/join/${sessionId}`;
-            
-            navigator.clipboard.writeText(joinURL).then(() => {
-                alert('Join URL copied to clipboard!');
-            }).catch(() => {
-                // Fallback for older browsers
-                const textArea = document.createElement('textarea');
-                textArea.value = joinURL;
-                document.body.appendChild(textArea);
-                textArea.select();
-                document.execCommand('copy');
-                document.body.removeChild(textArea);
-                alert('Join URL copied to clipboard!');
+            state.participants.forEach(p => {
+                list.appendChild(PW.el('span', 'lobby-chip' + (p.connected ? '' : ' offline'), `${p.emoji} ${p.alias}`));
             });
         }
 
-        // Handle start button click
-        document.getElementById('startBtn').addEventListener('click', async function() {
-            console.log('🚀 START BUTTON CLICKED!');
-            try {
-                console.log('Sending start session request...');
-                const response = await fetch('/api/start_session', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ session_id: sessionId })
-                });
-                
-                const data = await response.json();
-                console.log('Start session response:', data);
-                if (!data.success) {
-                    alert('Error starting session: ' + data.error);
-                } else {
-                    console.log('✅ Session start request successful');
-                    // Hide start button, show stop button
-                    document.getElementById('startBtn').style.display = 'none';
-                    document.getElementById('stopBtn').style.display = 'inline-block';
-                    
-                    // Update participant display to show during active session
-                    updateParticipantDisplay();
-                    
-                    // Load the first question and update display
-                    await loadCurrentQuestion();
-                }
-            } catch (error) {
-                console.error('Error:', error);
-                alert('Error starting session');
-            }
-        });
+        function renderWalk() {
+            const s = state, c = s.counts;
+            const finished = s.status === 'finished';
+            $('walkControls').classList.toggle('hidden', finished);
+            $('finishedControls').classList.toggle('hidden', !finished);
+            $('resultsView').classList.toggle('hidden', !finished);
 
-        // Handle stop button click
-        document.getElementById('stopBtn').addEventListener('click', async function() {
-            console.log('⏹️ STOP BUTTON CLICKED!');
-            try {
-                // For now, just reset the session
-                const response = await fetch('/api/reset_session', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ session_id: sessionId })
-                });
-                
-                const data = await response.json();
-                if (data.success) {
-                    // Show start button, hide stop button
-                    document.getElementById('startBtn').style.display = 'inline-block';
-                    document.getElementById('stopBtn').style.display = 'none';
-                    // Reset to main view
-                    showMainView();
-                }
-            } catch (error) {
-                console.error('Error:', error);
-                alert('Error stopping session');
-            }
-        });
+            if (finished) {
+                $('qNum').textContent = `All ${s.total_questions} questions done`;
+                $('qText').textContent = 'The walk is complete. Take a look at where everyone ended up.';
+                $('progressText').textContent = '';
+                localTimeLeft = null;
+                renderResults();
+            } else if (s.question) {
+                $('qNum').textContent = `Question ${s.question.number} of ${s.total_questions}`;
+                $('qText').textContent = s.question.text;
+                let prog = `✅ ${c.answered} answered`;
+                if (c.waiting_for) prog += ` · ⏳ waiting for ${c.waiting_for}`;
+                const offline = s.participants.filter(p => !p.connected && !p.answered).length;
+                if (offline) prog += ` · 📴 ${offline} disconnected (not waited for)`;
+                if (s.paused) prog += ' · ⏸ paused';
+                else if (s.advance_in !== null && s.advance_in !== undefined) prog += ' · everyone is in, moving on...';
+                else if (s.auto_held) prog += ' · auto-advance off for this question, press Next';
+                else if (s.straggler_countdown) prog += ' · most have answered, moving on soon';
+                $('progressText').textContent = prog;
 
-        // Handle next question button click
-        document.getElementById('nextQuestionBtn').addEventListener('click', async function() {
-            console.log('Next Question Button Clicked!');
-            try {
-                const response = await fetch(`/api/advance_question/${sessionId}`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ session_id: sessionId })
-                });
-                const data = await response.json();
-                console.log('Advance question response:', data);
-                if (data.success) {
-                    console.log('✅ Question advanced successfully');
-                    // Reload current question and progress
-                    await loadCurrentQuestion();
-                    updateQuestionProgress();
-                    // Re-create user markers to update their positions
-                    await createUserMarkers();
-                    
-                    // Update participant display for new question
-                    updateParticipantDisplay();
-                } else {
-                    alert('Error advancing question: ' + data.error);
-                }
-            } catch (error) {
-                console.error('Error advancing question:', error);
-                alert('Error advancing question');
+                const last = s.question.index >= s.total_questions - 1;
+                $('nextBtn').textContent = (last ? '🏁 Finish walk' : 'Next ➡') + (c.waiting_for ? ` (${c.waiting_for} still answering)` : '');
+                $('backBtn').disabled = busy || s.question.index === 0;
+                $('pauseBtn').textContent = s.paused ? '▶ Resume' : '⏸ Pause';
+                localTimeLeft = s.time_left;
             }
-        });
+            renderTimer();
+            renderGrid();
+            renderPeople();
+        }
 
-        // Function to advance to next question (called from onclick)
-        async function advanceToNextQuestion() {
-            console.log('Next Question Button Clicked!');
-            try {
-                const response = await fetch(`/api/advance_question/${sessionId}`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ session_id: sessionId })
-                });
-                const data = await response.json();
-                console.log('Advance question response:', data);
-                if (data.success) {
-                    console.log('✅ Question advanced successfully');
-                    
-                    // Show feedback if override was used
-                    if (data.override_used && data.unanswered_users && data.unanswered_users.length > 0) {
-                        console.log(`⚠️ Manual override used - ${data.unanswered_users.length} users were still pending:`, data.unanswered_users);
-                        // You could show a toast notification here if desired
-                    }
-                    
-                    // Reload current question and progress
-                    await loadCurrentQuestion();
-                    updateQuestionProgress();
-                    
-                    // Reset user answers for the new question (all users start as pending)
-                    Object.keys(userAnswers).forEach(username => {
-                        userAnswers[username] = false;
-                    });
-                    
-                    // Re-create user markers to update their positions
-                    await createUserMarkers();
-                    
-                    // Update participant display for new question
-                    updateParticipantDisplay();
-                } else {
-                    alert('Error advancing question: ' + data.error);
-                }
-            } catch (error) {
-                console.error('Error advancing question:', error);
-                alert('Error advancing question');
-            }
+        function renderTimer() {
+            const t = $('timer');
+            if (!state || state.status !== 'active' || localTimeLeft === null || localTimeLeft === undefined) { t.textContent = ''; return; }
+            t.textContent = `${localTimeLeft}s`;
+            t.classList.toggle('warn', localTimeLeft <= 10);
         }
-        
-        // Function to go to previous question
-        async function goToPreviousQuestion() {
-            console.log('Previous Question Button Clicked!');
-            if (currentQuestion <= 0) {
-                alert('Already at the first question');
-                return;
-            }
-            
-            try {
-                // For now, we'll just decrement the current question locally
-                // In a full implementation, you might want to add a backend endpoint for this
-                currentQuestion = currentQuestion - 1;
-                
-                // Reload current question and progress
-                await loadCurrentQuestion();
-                updateQuestionProgress();
-                
-                // Reset user answers for the previous question (all users start as pending)
-                Object.keys(userAnswers).forEach(username => {
-                    userAnswers[username] = false;
-                });
-                
-                // Update participant display for previous question
-                updateParticipantDisplay();
-                
-                // Update marker colors for previous question
-                updateMarkerColors();
-                
-                console.log(`✅ Moved to previous question: ${currentQuestion + 1}`);
-            } catch (error) {
-                console.error('Error going to previous question:', error);
-                alert('Error going to previous question');
-            }
-        }
-        
-        async function resumeSession() {
-            // Reload all session data
-            loadCurrentQuestion();
-            updateQuestionProgress();
-            loadUserPositions();
-            loadUserAnswers();
-            await createUserMarkers();
-            
-            // Update participant display
-            updateParticipantDisplay();
-        }
-        
-        function manualRefresh() {
-            console.log('Manual refresh requested...');
-            loadUserCount();
-            loadCurrentQuestion();
-            
-            // Also update participant display
-            updateParticipantDisplay();
-        }
-        
+        setInterval(() => {
+            if (state && state.status === 'active' && !state.paused && localTimeLeft > 0) { localTimeLeft--; renderTimer(); }
+        }, 1000);
 
-        
+        function initials(alias) { return alias.split(' ').map(w => w[0]).join(''); }
 
-        
-        function updateSessionStatusMessage(status) {
-            const statusMessage = document.getElementById('sessionStatusMessage');
-            if (statusMessage) {
-                if (status === 'waiting') {
-                    statusMessage.innerHTML = '✅ Session is ready - participants can join now!';
-                    statusMessage.style.background = '#d4edda';
-                    statusMessage.style.color = '#155724';
-                } else if (status === 'active') {
-                    statusMessage.innerHTML = '🚀 Session is in progress - questions are active';
-                    statusMessage.style.background = '#fff3cd';
-                    statusMessage.style.color = '#856404';
-                } else if (status === 'finished') {
-                    statusMessage.innerHTML = '🏁 Session completed';
-                    statusMessage.style.background = '#d1ecf1';
-                    statusMessage.style.color = '#0c5460';
+        function renderGrid() {
+            const people = state.participants;
+            const N = state.total_questions;
+            const n = people.length;
+            const rowsCount = 2 * N + 1;
+
+            const key = `${N}|${n}`;
+            if (key !== gridKey) {
+                gridKey = key;
+                const rows = $('rows');
+                rows.innerHTML = '';
+                for (let score = N; score >= -N; score--) {
+                    const row = PW.el('div', 'row' + (score === 0 ? ' zero' : ''));
+                    row.appendChild(PW.el('div', 'lbl', score > 0 ? `+${score}` : String(score)));
+                    rows.appendChild(row);
                 }
+                const cols = $('cols');
+                cols.style.backgroundImage = n ? 'linear-gradient(to right, rgba(0,0,0,0.12) 1px, transparent 1px)' : 'none';
+                cols.style.backgroundSize = n ? `${100 / n}% 100%` : '';
             }
-            
-            // Also update the question display when status changes
-            if (status === 'active') {
-                // Load the current question when session becomes active
-                loadCurrentQuestion();
-            }
-        }
-        
-        function updateParticipantDisplay() {
-            const participantDisplay = document.getElementById('participantDisplay');
-            const participantList = document.getElementById('participantList');
-            
-            if (participantDisplay && participantList) {
-                if (userCount === 0) {
-                    participantDisplay.style.display = 'none';
-                    return;
+            $('gridEmpty').classList.toggle('hidden', n > 0);
+
+            const wrap = $('gridWrap');
+            const colPx = n ? (wrap.clientWidth - 48) / n : 0;
+            const compact = colPx < 70;
+            const fontPx = Math.max(10, Math.min(14, colPx / 5));
+            const rowPx = wrap.clientHeight / rowsCount;
+
+            const seen = new Set();
+            people.forEach((p, i) => {
+                seen.add(p.pid);
+                let m = markers[p.pid];
+                if (!m) {
+                    m = PW.el('div', 'marker');
+                    markers[p.pid] = m;
+                    $('gridWrap').appendChild(m);
                 }
-                
-                // Show participant display during active sessions
-                if (currentQuestion > 0 || document.getElementById('privilegeWalkView').style.display !== 'none') {
-                    participantDisplay.style.display = 'block';
-                    
-                    // Ensure users is an array
-                    const userArray = Array.isArray(users) ? users : Object.keys(users);
-                    
-                    let participantHTML = '';
-                    for (const username of userArray) {
-                        const hasAnswered = currentQuestion > 0 ? (userAnswers[username] || false) : false;
-                        const statusClass = hasAnswered ? 'participant-answered' : 'participant-pending';
-                        const statusIcon = hasAnswered ? '✅' : '⏳';
-                        
-                        participantHTML += `
-                            <div class="participant-item ${statusClass}">
-                                <div class="participant-info">
-                                    <span class="participant-name">${username}</span>
-                                    <span class="participant-status">${statusIcon} ${hasAnswered ? 'Answered' : 'Pending'}</span>
-                                </div>
-                                <div class="participant-score" id="score-${username}">--</div>
-                            </div>
-                        `;
-                    }
-                    
-                    participantList.innerHTML = participantHTML;
-                } else {
-                    participantDisplay.style.display = 'none';
-                }
-            }
-        }
-        
-        function refreshQRCode() {
-            const qrImage = document.getElementById('qrCodeImage');
-            if (qrImage) {
-                qrImage.src = `/qr/${sessionId}?t=${Date.now()}`;
-            }
-        }
-        
-        function copyJoinURL() {
-            const joinUrlElement = document.getElementById('joinUrl');
-            const joinURL = joinUrlElement ? joinUrlElement.textContent : `{{ base_url }}/join/${sessionId}`;
-            
-            navigator.clipboard.writeText(joinURL).then(() => {
-                alert('Join URL copied to clipboard!');
-            }).catch(() => {
-                // Fallback for older browsers
-                const textArea = document.createElement('textarea');
-                textArea.value = joinURL;
-                document.body.appendChild(textArea);
-                textArea.select();
-                document.execCommand('copy');
-                document.body.removeChild(textArea);
-                alert('Join URL copied to clipboard!');
+                const label = compact ? `${p.emoji}${initials(p.alias)}` : `${p.emoji} ${p.alias}`;
+                if (m.textContent !== label) m.textContent = label;
+                m.title = `${p.alias}: ${p.score > 0 ? '+' : ''}${p.score}`;
+                const score = Math.max(-N, Math.min(N, p.score));
+                m.style.left = `calc(48px + (100% - 48px) * ${(i + 0.5) / n})`;
+                m.style.top = `${((N - score + 0.5) / rowsCount) * 100}%`;
+                m.style.maxWidth = `${Math.max(compact ? 36 : 28, colPx - 2)}px`;
+                m.style.padding = compact ? '0.1rem 0.15rem' : '';
+                m.style.fontSize = `${fontPx}px`;
+                m.style.lineHeight = `${Math.max(12, Math.min(rowPx - 2, 22))}px`;
+                let cls = 'marker';
+                if (state.status === 'active') cls += p.answered ? ' answered' : (p.connected ? ' pending' : ' offline');
+                else if (!p.connected) cls += ' offline';
+                if (m.className !== cls) m.className = cls;
+            });
+            Object.keys(markers).forEach(pid => {
+                if (!seen.has(pid)) { markers[pid].remove(); delete markers[pid]; }
             });
         }
 
-        // Function to check for REAL changes that require position updates (prevents flashing)
-        function checkForRealChanges(data) {
-            // Only update positions if there are actual score changes
-            // This is the most restrictive check to prevent any flashing
-            
-            // Check if positions have actually changed (only real score changes)
-            if (data.positions && lastKnownPositions) {
-                const currentPositions = JSON.stringify(data.positions);
-                const lastPositions = JSON.stringify(lastKnownPositions);
-                if (currentPositions !== lastPositions) {
-                    console.log('Real score changes detected, updating positions');
-                    return true;
+        function renderPeople() {
+            const box = $('people');
+            box.innerHTML = '';
+            if (!state.participants.length) { box.appendChild(PW.el('div', 'empty', 'No one has joined yet')); return; }
+            const sorted = [...state.participants].sort((a, b) => b.score - a.score);
+            sorted.forEach(p => {
+                const row = PW.el('div', 'person');
+                let dot = 'idle', tip = 'Connected';
+                if (!p.connected) { dot = 'offline'; tip = 'Disconnected'; }
+                if (state.status === 'active') {
+                    if (p.answered) { dot = 'answered'; tip = 'Answered'; }
+                    else if (p.connected) { dot = ''; tip = 'Still answering'; }
                 }
-            }
-            
-            // Check if question has changed (new question started)
-            if (data.current_question !== undefined && data.current_question !== lastKnownQuestion) {
-                lastKnownQuestion = data.current_question;
-                console.log('New question started, updating positions');
-                return true;
-            }
-            
-            // No real changes that require position updates
-            return false;
+                const d = PW.el('span', 'dot ' + dot); d.title = tip;
+                row.appendChild(d);
+                row.appendChild(PW.el('span', 'name', `${p.emoji} ${p.alias}`));
+                row.appendChild(PW.el('span', 'score', (p.score > 0 ? '+' : '') + p.score));
+                const rm = PW.el('button', 'remove', '✕');
+                rm.title = 'Remove this participant';
+                rm.addEventListener('click', () => {
+                    if (confirm(`Remove ${p.alias} from the walk? Their device will be asked to rejoin.`)) action('remove', { pid: p.pid });
+                });
+                row.appendChild(rm);
+                box.appendChild(row);
+            });
         }
-        
 
-        
-        // Create grid function
-        function createGrid() {
-            console.log('Creating grid...');
-            
-            const walkContainer = document.getElementById('walkContainer');
-            const walkGrid = document.getElementById('walkGrid');
-            
-            if (!walkContainer || !walkGrid) {
-                console.error('Walk container or grid not found');
-                return;
-            }
-            
-            // Clear existing grid
-            walkGrid.innerHTML = '';
-            
-            // Get user array
-            const userArray = Array.isArray(users) ? users : Object.keys(users);
-            const userCount = userArray.length;
-            
-            if (userCount === 0) {
-                console.log('No users, skipping grid creation');
-                return;
-            }
-            
-            // Calculate grid dimensions
-            const totalQuestions = window.totalQuestions || 12;
-            const maxScore = totalQuestions;
-            const minScore = -totalQuestions;
-            const totalRows = (2 * totalQuestions) + 1;
-            
-            console.log(`Creating grid: ${totalRows} rows, ${userCount + 1} columns (1 label + ${userCount} data)`);
-            
-            // Set the CSS grid template rows and columns dynamically
-            walkGrid.style.gridTemplateRows = `repeat(${totalRows}, 1fr)`;
-            walkGrid.style.gridTemplateColumns = `80px repeat(${userCount}, 1fr)`;
-            
-            // Create grid cells including label column
-            for (let row = 0; row < totalRows; row++) {
-                // First column: labels
-                const labelCell = document.createElement('div');
-                labelCell.className = 'grid-label-cell';
-                // Fix the order: maxScore at top (row 0), minScore at bottom (last row)
-                const score = maxScore - row; // From maxScore to minScore (top to bottom)
-                labelCell.textContent = score;
-                walkGrid.appendChild(labelCell);
-                
-                // Remaining columns: data cells
-                for (let col = 0; col < userCount; col++) {
-                    const cell = document.createElement('div');
-                    cell.className = 'grid-cell';
-                    walkGrid.appendChild(cell);
-                }
-            }
-            
-            // Mark grid as created
-            gridCreated = true;
-            console.log('=== GRID CREATION COMPLETE ===');
-            console.log(`Final grid: ${totalRows} rows, ${userCount + 1} columns (1 label + ${userCount} data)`);
-            console.log(`Label cells created: ${walkContainer.querySelectorAll('.grid-label-cell').length}`);
-            console.log(`Data cells created: ${walkContainer.querySelectorAll('.grid-cell').length}`);
+        function renderResults() {
+            const list = $('resultList');
+            list.innerHTML = '';
+            [...state.participants].sort((a, b) => b.score - a.score).forEach(p => {
+                const r = PW.el('div', 'result');
+                r.appendChild(PW.el('b', '', `#${p.rank}`));
+                r.appendChild(document.createTextNode(`${p.emoji} ${p.alias} (${p.score > 0 ? '+' : ''}${p.score})`));
+                list.appendChild(r);
+            });
         }
-        
-        // Start polling when page loads
-        document.addEventListener('DOMContentLoaded', function() {
-            console.log('Instructor page loaded, starting polling...');
-            
-            // Set the join URL dynamically
-            const joinUrlElement = document.getElementById('joinUrl');
-            if (joinUrlElement) {
-                const baseUrl = '{{ base_url }}'; // Use the server-provided base URL
-                const joinUrl = `${baseUrl}/join/${sessionId}`;
-                joinUrlElement.textContent = joinUrl;
-                console.log('Join URL set to:', joinUrl);
-            }
-            
-            // Load initial data immediately
-            loadUserCount();
-            loadCurrentQuestion();
-            
-            // Start polling for updates
-            startPolling();
-            
-            // Also update the session status message initially
-            updateSessionStatusMessage('waiting');
-        });
-        
 
-
-        // Clean up polling when page unloads
-        window.addEventListener('beforeunload', function() {
-            if (pollInterval) {
-                clearInterval(pollInterval);
-            }
+        // ---------- controls ----------
+        $('startBtn').addEventListener('click', () => {
+            if (!state) return;
+            if (!state.participants.length && !confirm('No students have joined yet. Start anyway?')) return;
+            action('start');
         });
+        $('nextBtn').addEventListener('click', () => {
+            const c = state.counts;
+            const last = state.question && state.question.index >= state.total_questions - 1;
+            if (last && !confirm('Finish the walk now?')) return;
+            action('next', { from_index: state.question ? state.question.index : null });
+        });
+        $('backBtn').addEventListener('click', () => action('back'));
+        $('reopenBtn').addEventListener('click', () => action('back'));
+        $('pauseBtn').addEventListener('click', () => action(state.paused ? 'resume' : 'pause'));
+        $('resetBtn').addEventListener('click', () => {
+            if (confirm('Start the walk again? Everyone keeps their anonymous name, but all answers are cleared.')) action('reset');
+        });
+        $('timerSelect').addEventListener('change', (e) => action('settings', { timer: +e.target.value }));
+        $('stragglerSelect').addEventListener('change', (e) => action('settings', { straggler_wait: +e.target.value }));
+        $('autoAdvance').addEventListener('change', (e) => action('settings', { auto_advance: e.target.checked }));
+        $('joiningOpen').addEventListener('change', (e) => action('settings', { joining_open: e.target.checked }));
+        window.addEventListener('resize', () => { if (state && state.status !== 'waiting') renderGrid(); });
+
+        PW.poller(poll, 1500, 5000);
     </script>
 </body>
-</html> 
+</html>

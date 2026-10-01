@@ -5,138 +5,98 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Privilege Walk - Create Session</title>
     <style>
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            margin: 0;
-            padding: 0;
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        
-        .container {
-            background: white;
-            padding: 3rem;
-            border-radius: 20px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
-            text-align: center;
-            max-width: 500px;
-            width: 90%;
-        }
-        
-        h1 {
-            color: #333;
-            margin-bottom: 2rem;
-            font-size: 2.5rem;
-        }
-        
-        .form-group {
-            margin-bottom: 2rem;
-            text-align: left;
-        }
-        
-        label {
-            display: block;
-            margin-bottom: 0.5rem;
-            color: #555;
-            font-weight: 600;
-        }
-        
-        input[type="text"] {
-            width: 100%;
-            padding: 1rem;
-            border: 2px solid #e1e5e9;
-            border-radius: 10px;
-            font-size: 1rem;
-            transition: border-color 0.3s ease;
-            box-sizing: border-box;
-        }
-        
-        input[type="text"]:focus {
-            outline: none;
-            border-color: #667eea;
-        }
-        
-        button {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border: none;
-            padding: 1rem 2rem;
-            border-radius: 10px;
-            font-size: 1.1rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: transform 0.2s ease;
-            width: 100%;
-        }
-        
-        button:hover {
-            transform: translateY(-2px);
-        }
-        
-        .description {
-            color: #666;
-            margin-bottom: 2rem;
-            line-height: 1.6;
-        }
+        * { box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 16px; min-height: 100vh;
+               display: flex; align-items: center; justify-content: center;
+               background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .container { background: white; padding: 2.5rem; border-radius: 20px; box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+                     max-width: 520px; width: 100%; }
+        h1 { color: #333; margin: 0 0 1rem; font-size: 2.2rem; text-align: center; }
+        .description { color: #666; line-height: 1.6; text-align: center; }
+        label { display: block; margin-bottom: 0.5rem; color: #555; font-weight: 600; }
+        input[type="text"] { width: 100%; padding: 1rem; border: 2px solid #e1e5e9; border-radius: 10px; font-size: 1rem; }
+        input[type="text"]:focus { outline: none; border-color: #667eea; }
+        button { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; padding: 1rem 2rem;
+                 border-radius: 10px; font-size: 1.1rem; font-weight: 600; cursor: pointer; width: 100%; margin-top: 1rem; }
+        button:disabled { opacity: 0.6; cursor: wait; }
+        .error { color: #b02a37; background: #f8d7da; border-radius: 8px; padding: 0.75rem; margin-top: 1rem; display: none; }
+        .recent { margin-top: 2rem; border-top: 2px solid #eee; padding-top: 1.25rem; display: none; }
+        .recent h2 { font-size: 1.05rem; color: #333; margin: 0 0 0.75rem; }
+        .recent a { display: flex; justify-content: space-between; gap: 1rem; padding: 0.75rem 1rem; margin-bottom: 0.5rem;
+                    background: #f8f9fa; border-left: 4px solid #667eea; border-radius: 8px; color: #333; text-decoration: none; }
+        .recent a:hover { background: #eef0fb; }
+        .recent small { color: #888; white-space: nowrap; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>🚶‍♂️ Privilege Walk</h1>
+        <h1>🚶 Privilege Walk</h1>
         <p class="description">
-            Create a new session for your students to participate in the privilege walk activity. 
-            Each session will have a unique QR code that students can scan to join.
+            Each class gets its own session with its own QR code, so several teachers can run walks at the same time
+            without affecting each other. Students join anonymously.
         </p>
-        
+
         <form id="createSessionForm">
-            <div class="form-group">
-                <label for="sessionName">Session Name:</label>
-                <input type="text" id="sessionName" name="sessionName" 
-                       placeholder="e.g., Sociology 101 - Section A" required>
-            </div>
-            
-            <button type="submit">Create New Session</button>
+            <label for="sessionName">Session name (shown to students)</label>
+            <input type="text" id="sessionName" maxlength="80" placeholder="e.g., Sociology 101 - Section A">
+            <button type="submit" id="createBtn">Create New Session</button>
+            <div class="error" id="error"></div>
         </form>
+
+        <div class="recent" id="recent">
+            <h2>Your sessions on this device</h2>
+            <div id="recentList"></div>
+        </div>
     </div>
 
+    <script src="/static/common.js"></script>
     <script>
-        document.getElementById('createSessionForm').addEventListener('submit', async function(e) {
+        const RECENT_KEY = 'pw:recent';
+
+        function renderRecent() {
+            const list = (PW.store.get(RECENT_KEY) || []).filter(r => Date.now() - r.created < 24 * 3600 * 1000);
+            PW.store.set(RECENT_KEY, list);
+            const box = document.getElementById('recentList');
+            box.innerHTML = '';
+            list.forEach(r => {
+                const a = PW.el('a');
+                a.href = `/instructor/${encodeURIComponent(r.id)}?key=${encodeURIComponent(r.key)}`;
+                a.appendChild(PW.el('span', '', r.name || `Session ${r.id}`));
+                a.appendChild(PW.el('small', '', new Date(r.created).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })));
+                box.appendChild(a);
+            });
+            document.getElementById('recent').style.display = list.length ? 'block' : 'none';
+        }
+
+        document.getElementById('createSessionForm').addEventListener('submit', async (e) => {
             e.preventDefault();
-            
-            const sessionName = document.getElementById('sessionName').value;
-            const button = document.querySelector('button');
-            const originalText = button.textContent;
-            
-            button.textContent = 'Creating...';
-            button.disabled = true;
-            
-            try {
-                const response = await fetch('/create_session', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded',
-                    },
-                    body: `session_name=${encodeURIComponent(sessionName)}`
-                });
-                
-                const data = await response.json();
-                
-                if (data.session_id) {
-                    window.location.href = `/instructor/${data.session_id}`;
-                } else {
-                    alert('Error creating session');
-                }
-            } catch (error) {
-                console.error('Error:', error);
-                alert('Error creating session');
-            } finally {
-                button.textContent = originalText;
-                button.disabled = false;
+            const btn = document.getElementById('createBtn');
+            const err = document.getElementById('error');
+            btn.disabled = true;
+            btn.textContent = 'Creating...';
+            err.style.display = 'none';
+            const name = document.getElementById('sessionName').value.trim();
+            // Retry a few times: the free hosting tier can take a while to wake up.
+            let r = null;
+            for (let attempt = 0; attempt < 4; attempt++) {
+                r = await PW.api('/create_session', { method: 'POST', body: { session_name: name }, timeout: 30000 });
+                if (r.ok || (!r.network && r.status < 500)) break;
+                await new Promise(res => setTimeout(res, 2000));
             }
+            if (r && r.ok && r.data.session_id) {
+                const list = PW.store.get(RECENT_KEY) || [];
+                list.unshift({ id: r.data.session_id, key: r.data.host_key, name: name, created: Date.now() });
+                PW.store.set(RECENT_KEY, list.slice(0, 10));
+                window.location.href = `/instructor/${r.data.session_id}`;
+                return;
+            }
+            err.textContent = (r && r.data && r.data.error) || 'Could not reach the server. Check your connection and try again.';
+            err.style.display = 'block';
+            btn.disabled = false;
+            btn.textContent = 'Create New Session';
         });
+
+        renderRecent();
     </script>
 </body>
-</html> 
+</html>

@@ -1,454 +1,500 @@
 #!/usr/bin/env python3
 """
-Comprehensive tests for Privilege Walk application
+Tests for the Privilege Walk server.
 Run with: python -m pytest test_app.py -v
 """
 
-import pytest
-import json
-import tempfile
 import os
-from datetime import datetime, timedelta
-from unittest.mock import patch, MagicMock
 import sys
-import os
 
-# Add the current directory to Python path to import app
+os.environ['PW_NO_BACKGROUND'] = '1'
+os.environ['PW_DATA_FILE'] = ''
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from app import app, active_sessions, load_questions, calculate_user_rankings, cleanup_old_sessions
+import pytest  # noqa: E402
+
+import app as appmod  # noqa: E402
+from app import app, active_sessions  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def clean_state():
+    active_sessions.clear()
+    appmod._token_index.clear()
+    appmod._rejoin_failures.clear()
+    yield
+    active_sessions.clear()
+
 
 @pytest.fixture
-def client():
-    """Create a test client for the Flask app"""
+def clock(monkeypatch):
+    """Controllable clock so timers and connection windows can be tested."""
+    t = {'now': 1_000_000.0}
+    monkeypatch.setattr(appmod, 'now', lambda: t['now'])
+    return t
+
+
+def make_client():
     app.config['TESTING'] = True
-    with app.test_client() as client:
-        yield client
+    return app.test_client()
+
 
 @pytest.fixture
-def sample_session_data():
-    """Sample session data for testing"""
-    return {
-        'session_id': 'test_session_123',
-        'session_name': 'Test Session',
-        'status': 'waiting',
-        'current_question': 0,
-        'questions': [
-            "I have rarely been judged negatively or discriminated against because of my body size.",
-            "My mental health is generally robust, and it has never seriously limited my opportunities.",
-            "I am neurotypical, and my ways of thinking and learning are usually supported in school or work."
-        ],
-        'users': {
-            'student1': {
-                'username': 'student1',
-                'position': 0,
-                'answers': []
-            },
-            'student2': {
-                'username': 'student2',
-                'position': 0,
-                'answers': []
-            }
-        },
-        'created_at': datetime.now().isoformat(),
-        'last_activity': datetime.now().isoformat()
-    }
+def host():
+    return make_client()
 
-@pytest.fixture
-def sample_questions():
-    """Sample questions for testing"""
-    return [
-        "I have rarely been judged negatively or discriminated against because of my body size.",
-        "My mental health is generally robust, and it has never seriously limited my opportunities.",
-        "I am neurotypical, and my ways of thinking and learning are usually supported in school or work."
-    ]
 
-class TestAppInitialization:
-    """Test app initialization and basic setup"""
-    
-    def test_app_creation(self):
-        """Test that the Flask app is created correctly"""
-        assert app is not None
-        assert hasattr(app, 'route')
-    
-    def test_load_questions(self, sample_questions):
-        """Test that questions can be loaded"""
-        with patch('builtins.open', create=True) as mock_open:
-            mock_open.return_value.__enter__.return_value.read.return_value = json.dumps({
-                'questions': sample_questions
-            })
-            questions = load_questions()
-            assert len(questions) == 3
-            assert "body size" in questions[0]
-    
-    def test_load_questions_fallback(self):
-        """Test that questions fallback to defaults if file not found"""
-        with patch('builtins.open', side_effect=FileNotFoundError):
-            questions = load_questions()
-            assert len(questions) == 12  # Default questions
-            assert "body size" in questions[0]
+def create(host, name='Class A'):
+    r = host.post('/create_session', json={'session_name': name})
+    assert r.status_code == 200
+    return r.get_json()
 
-class TestSessionManagement:
-    """Test session creation and management"""
-    
-    def test_create_session(self, client):
-        """Test creating a new session"""
-        response = client.post('/create_session', data={'session_name': 'Test Session'})
-        assert response.status_code == 200
-        data = json.loads(response.data)
-        assert 'session_id' in data
-        assert data['session_name'] == 'Test Session'
-    
-    def test_create_session_missing_name(self, client):
-        """Test creating session without name"""
-        response = client.post('/create_session', data={})
-        assert response.status_code == 400
-    
-    def test_instructor_view(self, client, sample_session_data):
-        """Test instructor view page loads"""
-        # Add session to active_sessions
-        active_sessions[sample_session_data['session_id']] = sample_session_data
-        
-        response = client.get(f'/instructor/{sample_session_data["session_id"]}')
-        assert response.status_code == 200
-        assert b'Privilege Walk Session' in response.data
-    
-    def test_instructor_view_invalid_session(self, client):
-        """Test instructor view with invalid session ID"""
-        response = client.get('/instructor/invalid_session')
-        assert response.status_code == 404
 
-class TestStudentJoin:
-    """Test student joining functionality"""
-    
-    def test_student_join_page(self, client, sample_session_data):
-        """Test student join page loads"""
-        active_sessions[sample_session_data['session_id']] = sample_session_data
-        
-        response = client.get(f'/join/{sample_session_data["session_id"]}')
-        assert response.status_code == 200
-        assert b'Join Session' in response.data
-    
-    def test_student_join_invalid_session(self, client):
-        """Test student join with invalid session"""
-        response = client.get('/join/invalid_session')
-        assert response.status_code == 404
-    
-    def test_student_join_post(self, client, sample_session_data):
-        """Test student joining a session"""
-        active_sessions[sample_session_data['session_id']] = sample_session_data
-        
-        response = client.post(f'/join/{sample_session_data["session_id"]}', 
-                              data={'username': 'newstudent'})
-        assert response.status_code == 200
-        data = json.loads(response.data)
-        assert data['success'] == True
-        
-        # Check user was added to session
-        session = active_sessions[sample_session_data['session_id']]
-        assert 'newstudent' in session['users']
-    
-    def test_student_join_duplicate_username(self, client, sample_session_data):
-        """Test student join with duplicate username"""
-        active_sessions[sample_session_data['session_id']] = sample_session_data
-        
-        response = client.post(f'/join/{sample_session_data["session_id"]}', 
-                              data={'username': 'student1'})
-        assert response.status_code == 400
-        data = json.loads(response.data)
-        assert 'already exists' in data['error']
+def join(sid):
+    """A fresh device (own cookie jar) joining the session."""
+    c = make_client()
+    r = c.post(f'/api/s/{sid}/join', json={})
+    assert r.status_code == 200, r.get_json()
+    return c, r.get_json()['me']
 
-class TestSessionControl:
-    """Test session start/stop functionality"""
-    
-    def test_start_session(self, client, sample_session_data):
-        """Test starting a session"""
-        active_sessions[sample_session_data['session_id']] = sample_session_data
-        
-        response = client.post(f'/api/start_session/{sample_session_data["session_id"]}')
-        assert response.status_code == 200
-        data = json.loads(response.data)
-        assert data['success'] == True
-        
-        # Check session status changed
-        session = active_sessions[sample_session_data['session_id']]
-        assert session['status'] == 'active'
-    
-    def test_start_session_invalid(self, client):
-        """Test starting invalid session"""
-        response = client.post('/api/start_session/invalid_session')
-        assert response.status_code == 404
-    
-    def test_stop_session(self, client, sample_session_data):
-        """Test stopping a session"""
-        sample_session_data['status'] = 'active'
-        active_sessions[sample_session_data['session_id']] = sample_session_data
-        
-        response = client.post(f'/api/stop_session/{sample_session_data["session_id"]}')
-        assert response.status_code == 200
-        data = json.loads(response.data)
-        assert data['success'] == True
-        
-        # Check session status changed
-        session = active_sessions[sample_session_data['session_id']]
-        assert session['status'] == 'finished'
 
-class TestAnswerSubmission:
-    """Test student answer submission"""
-    
-    def test_submit_answer(self, client, sample_session_data):
-        """Test student submitting an answer"""
-        sample_session_data['status'] = 'active'
-        active_sessions[sample_session_data['session_id']] = sample_session_data
-        
-        response = client.post(f'/api/submit_answer/{sample_session_data["session_id"]}',
-                              json={'username': 'student1', 'answer': 'agree'})
-        assert response.status_code == 200
-        data = json.loads(response.data)
-        assert data['success'] == True
-        
-        # Check answer was recorded
-        session = active_sessions[sample_session_data['session_id']]
-        user = session['users']['student1']
-        assert len(user['answers']) == 1
-        assert user['answers'][0] == 'agree'
-        assert user['position'] == 1  # +1 for agree
-    
-    def test_submit_answer_disagree(self, client, sample_session_data):
-        """Test student submitting disagree answer"""
-        sample_session_data['status'] = 'active'
-        active_sessions[sample_session_data['session_id']] = sample_session_data
-        
-        response = client.post(f'/api/submit_answer/{sample_session_data["session_id"]}',
-                              json={'username': 'student1', 'answer': 'disagree'})
-        assert response.status_code == 200
-        
-        # Check position decreased
-        session = active_sessions[sample_session_data['session_id']]
-        user = session['users']['student1']
-        assert user['position'] == -1  # -1 for disagree
-    
-    def test_submit_answer_invalid_session(self, client):
-        """Test submitting answer to invalid session"""
-        response = client.post('/api/submit_answer/invalid_session',
-                              json={'username': 'student1', 'answer': 'agree'})
-        assert response.status_code == 404
-    
-    def test_submit_answer_invalid_user(self, client, sample_session_data):
-        """Test submitting answer with invalid username"""
-        sample_session_data['status'] = 'active'
-        active_sessions[sample_session_data['session_id']] = sample_session_data
-        
-        response = client.post(f'/api/submit_answer/{sample_session_data["session_id"]}',
-                              json={'username': 'invalid_user', 'answer': 'agree'})
-        assert response.status_code == 400
+def state(c, sid, token=None):
+    headers = {'X-Participant-Token': token} if token else {}
+    return c.get(f'/api/s/{sid}/state', headers=headers).get_json()
 
-class TestQuestionProgression:
-    """Test question progression and advancement"""
-    
-    def test_automatic_question_progression(self, client, sample_session_data):
-        """Test that questions automatically progress when all users answer"""
-        sample_session_data['status'] = 'active'
-        active_sessions[sample_session_data['session_id']] = sample_session_data
-        
-        # All users answer first question
-        for username in sample_session_data['users']:
-            response = client.post(f'/api/submit_answer/{sample_session_data["session_id"]}',
-                                  json={'username': username, 'answer': 'agree'})
-            assert response.status_code == 200
-        
-        # Check question progressed
-        session = active_sessions[sample_session_data['session_id']]
-        assert session['current_question'] == 1
-    
-    def test_manual_question_advancement(self, client, sample_session_data):
-        """Test manual question advancement by instructor"""
-        sample_session_data['status'] = 'active'
-        # Make sure all users have answered current question
-        for username in sample_session_data['users']:
-            sample_session_data['users'][username]['answers'] = ['agree']
-        active_sessions[sample_session_data['session_id']] = sample_session_data
-        
-        response = client.post(f'/api/advance_question/{sample_session_data["session_id"]}',
-                              json={'session_id': sample_session_data['session_id']})
-        assert response.status_code == 200
-        data = json.loads(response.data)
-        assert data['success'] == True
-        
-        # Check question advanced
-        session = active_sessions[sample_session_data['session_id']]
-        assert session['current_question'] == 1
-    
-    def test_advance_question_not_all_answered(self, client, sample_session_data):
-        """Test that question can't advance if not all users answered"""
-        sample_session_data['status'] = 'active'
-        active_sessions[sample_session_data['session_id']] = sample_session_data
-        
-        response = client.post(f'/api/advance_question/{sample_session_data["session_id"]}',
-                              json={'session_id': sample_session_data['session_id']})
-        assert response.status_code == 400
-        data = json.loads(response.data)
-        assert 'Not all users have answered' in data['error']
 
-class TestRankingsAndScoring:
-    """Test user rankings and scoring system"""
-    
-    def test_calculate_user_rankings(self, sample_session_data):
-        """Test user ranking calculation"""
-        # Set different positions for users
-        sample_session_data['users']['student1']['position'] = 2
-        sample_session_data['users']['student2']['position'] = -1
-        
-        rankings = calculate_user_rankings(sample_session_data)
-        
-        assert 'student1' in rankings
-        assert 'student2' in rankings
-        assert rankings['student1']['rank'] == 1  # Highest score
-        assert rankings['student2']['rank'] == 2  # Lower score
-        assert rankings['student1']['position'] == 2
-        assert rankings['student2']['position'] == -1
-    
-    def test_get_rankings_api(self, client, sample_session_data):
-        """Test rankings API endpoint"""
-        sample_session_data['status'] = 'active'
-        active_sessions[sample_session_data['session_id']] = sample_session_data
-        
-        response = client.get(f'/api/rankings/{sample_session_data["session_id"]}')
-        assert response.status_code == 200
-        data = json.loads(response.data)
-        assert 'rankings' in data
-        assert 'current_question' in data
-        assert 'total_questions' in data
+def answer(c, sid, index, value='agree'):
+    return c.post(f'/api/s/{sid}/answer', json={'answer': value, 'question_index': index})
 
-class TestUserAnswers:
-    """Test user answer tracking"""
-    
-    def test_get_user_answers(self, client, sample_session_data):
-        """Test getting user answer status"""
-        sample_session_data['status'] = 'active'
-        # Add some answers
-        sample_session_data['users']['student1']['answers'] = ['agree']
-        active_sessions[sample_session_data['session_id']] = sample_session_data
-        
-        response = client.get(f'/api/user_answers/{sample_session_data["session_id"]}')
-        assert response.status_code == 200
-        data = json.loads(response.data)
-        assert 'user_answers' in data
-        assert 'student1' in data['user_answers']
-        assert data['user_answers']['student1']['answered'] == True
-        assert data['user_answers']['student2']['answered'] == False
 
-class TestSessionPersistence:
-    """Test session persistence and cleanup"""
-    
-    def test_session_cleanup(self):
-        """Test cleanup of old sessions"""
-        # Create old session
-        old_session = {
-            'session_id': 'old_session',
-            'last_activity': (datetime.now() - timedelta(hours=25)).isoformat(),
-            'users': {},
-            'questions': ['test'],
-            'current_question': 0,
-            'status': 'finished'
-        }
-        active_sessions['old_session'] = old_session
-        
-        # Create recent session
-        recent_session = {
-            'session_id': 'recent_session',
-            'last_activity': datetime.now().isoformat(),
-            'users': {},
-            'questions': ['test'],
-            'current_question': 0,
-            'status': 'active'
-        }
-        active_sessions['recent_session'] = recent_session
-        
-        initial_count = len(active_sessions)
-        cleanup_old_sessions()
-        
-        # Old session should be removed, recent kept
-        assert 'old_session' not in active_sessions
-        assert 'recent_session' in active_sessions
-        assert len(active_sessions) == initial_count - 1
+def hstate(host, sid):
+    r = host.get(f'/api/h/{sid}/state')
+    assert r.status_code == 200
+    return r.get_json()
 
-class TestHealthAndUtilities:
-    """Test health check and utility endpoints"""
-    
-    def test_health_check(self, client):
-        """Test health check endpoint"""
-        response = client.get('/health')
-        assert response.status_code == 200
-        data = json.loads(response.data)
-        assert 'status' in data
-        assert data['status'] == 'healthy'
-        assert 'active_sessions' in data
-    
-    def test_cleanup_endpoint(self, client):
-        """Test manual cleanup endpoint"""
-        response = client.get('/cleanup')
-        assert response.status_code == 200
-        data = json.loads(response.data)
-        assert 'status' in data
 
-class TestErrorHandling:
-    """Test error handling and edge cases"""
-    
-    def test_invalid_json_submission(self, client, sample_session_data):
-        """Test handling of invalid JSON in answer submission"""
-        sample_session_data['status'] = 'active'
-        active_sessions[sample_session_data['session_id']] = sample_session_data
-        
-        response = client.post(f'/api/submit_answer/{sample_session_data["session_id"]}',
-                              data='invalid json',
-                              content_type='application/json')
-        assert response.status_code == 400
-    
-    def test_missing_fields_in_answer(self, client, sample_session_data):
-        """Test handling of missing fields in answer submission"""
-        sample_session_data['status'] = 'active'
-        active_sessions[sample_session_data['session_id']] = sample_session_data
-        
-        response = client.post(f'/api/submit_answer/{sample_session_data["session_id"]}',
-                              json={'username': 'student1'})  # Missing answer
-        assert response.status_code == 400
+def short_questions(sid, n=3):
+    active_sessions[sid]['questions'] = [f'Q{i + 1}' for i in range(n)]
 
-def run_tests():
-    """Run all tests and report results"""
-    print("🧪 Running Privilege Walk Application Tests...")
-    print("=" * 50)
-    
-    # Import pytest and run tests
-    try:
-        import pytest
-        pytest.main([__file__, '-v', '--tb=short'])
-    except ImportError:
-        print("❌ pytest not installed. Install with: pip install pytest")
-        print("Running basic tests...")
-        
-        # Basic test runner
-        test_functions = [func for func in globals().values() 
-                         if callable(func) and func.__name__.startswith('test_')]
-        
-        passed = 0
-        failed = 0
-        
-        for test_func in test_functions:
-            try:
-                test_func()
-                print(f"✅ {test_func.__name__}")
-                passed += 1
-            except Exception as e:
-                print(f"❌ {test_func.__name__}: {str(e)}")
-                failed += 1
-        
-        print(f"\n📊 Test Results: {passed} passed, {failed} failed")
-        
-        if failed == 0:
-            print("🎉 All tests passed!")
-        else:
-            print("⚠️  Some tests failed. Please fix issues before pushing.")
 
-if __name__ == '__main__':
-    run_tests()
+class TestSessions:
+    def test_questions_load(self):
+        qs = appmod.load_questions()
+        assert len(qs) >= 1 and all(isinstance(q, str) for q in qs)
+
+    def test_multiple_sessions_are_isolated(self, host):
+        a = create(host, 'A')
+        b = create(make_client(), 'B')
+        assert a['session_id'] != b['session_id']
+        ca, _ = join(a['session_id'])
+        join(b['session_id'])
+        join(b['session_id'])
+        host.post(f"/api/h/{a['session_id']}/start", json={})
+        assert active_sessions[a['session_id']]['status'] == 'active'
+        assert active_sessions[b['session_id']]['status'] == 'waiting'
+        assert len(active_sessions[a['session_id']]['participants']) == 1
+        assert len(active_sessions[b['session_id']]['participants']) == 2
+
+    def test_teacher_controls_need_key(self, host):
+        sid = create(host)['session_id']
+        student, _ = join(sid)
+        assert student.post(f'/api/h/{sid}/start', json={}).status_code == 403
+        assert student.get(f'/api/h/{sid}/state').status_code == 403
+        assert student.get(f'/instructor/{sid}').status_code == 403
+        assert host.get(f'/instructor/{sid}').status_code == 200
+
+    def test_teacher_link_on_new_device(self, host):
+        created = create(host)
+        sid, key = created['session_id'], created['host_key']
+        other = make_client()
+        r = other.get(f'/instructor/{sid}?key={key}')
+        assert r.status_code == 302 and r.headers['Location'].endswith(f'/instructor/{sid}')
+        assert other.get(f'/instructor/{sid}').status_code == 200
+        assert make_client().get(f'/instructor/{sid}?key=wrong').status_code == 403
+
+    def test_qr_and_pages(self, host):
+        sid = create(host)['session_id']
+        assert host.get(f'/qr/{sid}').mimetype == 'image/png'
+        assert host.get(f'/join/{sid}').status_code == 200
+        assert host.get(f'/student/{sid}?username=legacy').status_code == 200
+        assert host.get('/join/nope').status_code == 404
+        assert host.get('/qr/nope').status_code == 404
+
+    def test_public_base_url(self, host, monkeypatch):
+        monkeypatch.setenv('PUBLIC_BASE_URL', 'https://walk.example.org/')
+        sid = create(host)['session_id']
+        assert f'https://walk.example.org/join/{sid}' in host.get(f'/instructor/{sid}').get_data(as_text=True)
+
+
+class TestIdentity:
+    def test_join_gives_anonymous_unique_identity(self, host):
+        sid = create(host)['session_id']
+        ids = [join(sid)[1] for _ in range(30)]
+        assert len({i['alias'] for i in ids}) == 30
+        assert len({i['code'] for i in ids}) == 30
+        assert len({i['token'] for i in ids}) == 30
+
+    def test_rejoin_same_device_returns_same_person(self, host):
+        sid = create(host)['session_id']
+        c, me = join(sid)
+        again = c.post(f'/api/s/{sid}/join', json={}).get_json()['me']
+        assert again['pid'] == me['pid']
+        assert len(active_sessions[sid]['participants']) == 1
+
+    def test_token_header_works_without_cookie(self, host):
+        sid = create(host)['session_id']
+        _, me = join(sid)
+        fresh = make_client()
+        s = state(fresh, sid, token=me['token'])
+        assert s['me']['pid'] == me['pid']
+        r = fresh.post(f'/api/s/{sid}/join', json={}, headers={'X-Participant-Token': me['token']})
+        assert r.get_json()['me']['pid'] == me['pid']
+
+    def test_rejoin_with_code_on_new_device(self, host):
+        sid = create(host)['session_id']
+        short_questions(sid)
+        c, me = join(sid)
+        host.post(f'/api/h/{sid}/start', json={})
+        answer(c, sid, 0, 'agree')
+        new_device = make_client()
+        r = new_device.post(f'/api/s/{sid}/rejoin', json={'code': me['code'].lower()})
+        assert r.status_code == 200
+        s = state(new_device, sid)
+        assert s['me']['pid'] == me['pid'] and s['me']['score'] == 1 and s['me']['answer'] == 'agree'
+
+    def test_rejoin_code_rate_limited(self, host):
+        sid = create(host)['session_id']
+        join(sid)
+        c = make_client()
+        codes = [p['code'] for p in active_sessions[sid]['participants'].values()]
+        bad = 'ZZZZ' if 'ZZZZ' not in codes else 'YYYY'
+        for _ in range(appmod.REJOIN_MAX_FAILS):
+            assert c.post(f'/api/s/{sid}/rejoin', json={'code': bad}).status_code == 404
+        assert c.post(f'/api/s/{sid}/rejoin', json={'code': codes[0]}).status_code == 429
+
+    def test_closed_joining(self, host):
+        sid = create(host)['session_id']
+        c, me = join(sid)
+        host.post(f'/api/h/{sid}/settings', json={'joining_open': False})
+        r = make_client().post(f'/api/s/{sid}/join', json={})
+        assert r.status_code == 403 and r.get_json()['closed']
+        # Existing students can still come back.
+        assert c.post(f'/api/s/{sid}/join', json={}).status_code == 200
+        assert make_client().post(f'/api/s/{sid}/rejoin', json={'code': me['code']}).status_code == 200
+
+    def test_removed_participant_must_rejoin(self, host):
+        sid = create(host)['session_id']
+        c, me = join(sid)
+        host.post(f'/api/h/{sid}/remove', json={'pid': me['pid']})
+        assert state(c, sid)['me'] is None
+        host.post(f'/api/h/{sid}/start', json={})
+        assert answer(c, sid, 0).status_code == 401
+
+
+class TestAnswers:
+    def test_answer_is_idempotent_and_changeable(self, host):
+        sid = create(host)['session_id']
+        c, _ = join(sid)
+        join(sid)  # second student so the walk doesn't auto-advance
+        host.post(f'/api/h/{sid}/start', json={})
+        for _ in range(3):
+            assert answer(c, sid, 0, 'agree').status_code == 200
+        assert state(c, sid)['me']['score'] == 1
+        answer(c, sid, 0, 'disagree')
+        assert state(c, sid)['me']['score'] == -1
+
+    def test_stale_answer_rejected(self, host):
+        sid = create(host)['session_id']
+        short_questions(sid)
+        c, _ = join(sid)
+        join(sid)
+        host.post(f'/api/h/{sid}/start', json={})
+        host.post(f'/api/h/{sid}/next', json={'from_index': 0})
+        r = answer(c, sid, 0)
+        assert r.status_code == 409 and r.get_json()['question']['index'] == 1
+        assert state(c, sid)['me']['score'] == 0
+
+    def test_missed_question_does_not_shift_later_answers(self, host):
+        sid = create(host)['session_id']
+        short_questions(sid)
+        c, _ = join(sid)
+        join(sid)
+        host.post(f'/api/h/{sid}/start', json={})
+        host.post(f'/api/h/{sid}/next', json={'from_index': 0})
+        answer(c, sid, 1, 'agree')
+        s = state(c, sid)
+        assert s['me']['answer'] == 'agree' and s['question']['index'] == 1
+        # Answering again doesn't double count.
+        answer(c, sid, 1, 'agree')
+        assert state(c, sid)['me']['score'] == 1
+
+    def test_bad_answer_values(self, host):
+        sid = create(host)['session_id']
+        c, _ = join(sid)
+        host.post(f'/api/h/{sid}/start', json={})
+        assert c.post(f'/api/s/{sid}/answer', json={'answer': 'maybe', 'question_index': 0}).status_code == 400
+        assert c.post(f'/api/s/{sid}/answer', json={'answer': 'agree'}).status_code == 400
+        assert c.post(f'/api/s/{sid}/answer', data='junk').status_code == 400
+
+    def test_answer_before_start(self, host):
+        sid = create(host)['session_id']
+        c, _ = join(sid)
+        assert answer(c, sid, 0).status_code == 409
+
+
+class TestProgression:
+    def test_auto_advance_when_all_connected_answered(self, host, clock):
+        sid = create(host)['session_id']
+        short_questions(sid)
+        a, _ = join(sid)
+        b, _ = join(sid)
+        host.post(f'/api/h/{sid}/start', json={})
+        answer(a, sid, 0)
+        assert hstate(host, sid)['current'] == 0
+        answer(b, sid, 0, 'disagree')
+        s = hstate(host, sid)
+        assert s['current'] == 0 and s['advance_in'] is not None   # grace period
+        clock['now'] += appmod.AUTO_ADVANCE_GRACE + 0.1
+        assert hstate(host, sid)['current'] == 1
+
+    def test_disconnected_student_not_waited_for(self, host, clock):
+        sid = create(host)['session_id']
+        short_questions(sid)
+        a, _ = join(sid)
+        sleeper, _ = join(sid)
+        host.post(f'/api/h/{sid}/start', json={})
+        clock['now'] += appmod.ACTIVE_WINDOW + 1   # sleeper's phone goes to sleep
+        state(a, sid)                               # a keeps polling
+        answer(a, sid, 0)
+        clock['now'] += appmod.AUTO_ADVANCE_GRACE + 0.1
+        state(a, sid)
+        assert hstate(host, sid)['current'] == 1
+        # Sleeper wakes up and lands on the current question, as the same person.
+        s = state(sleeper, sid)
+        assert s['question']['index'] == 1 and s['me']['answer'] is None
+        assert answer(sleeper, sid, 1).status_code == 200
+
+    def test_reconnecting_student_cancels_pending_auto_advance(self, host, clock):
+        sid = create(host)['session_id']
+        short_questions(sid)
+        a, _ = join(sid)
+        b, _ = join(sid)
+        host.post(f'/api/h/{sid}/start', json={})
+        clock['now'] += appmod.ACTIVE_WINDOW + 1
+        state(a, sid)
+        answer(a, sid, 0)
+        assert hstate(host, sid)['advance_in'] is not None
+        state(b, sid)   # b comes back before the grace period ends
+        assert hstate(host, sid)['advance_in'] is None
+        clock['now'] += appmod.AUTO_ADVANCE_GRACE + 1
+        state(b, sid)
+        assert hstate(host, sid)['current'] == 0
+
+    def test_timer_advances_without_answers(self, host, clock):
+        sid = create(host)['session_id']
+        short_questions(sid)
+        join(sid)
+        host.post(f'/api/h/{sid}/settings', json={'timer': 30})
+        host.post(f'/api/h/{sid}/start', json={})
+        assert hstate(host, sid)['time_left'] == 30
+        clock['now'] += 31
+        assert hstate(host, sid)['current'] == 1
+
+    def test_timer_finishes_walk(self, host, clock):
+        sid = create(host)['session_id']
+        short_questions(sid, 2)
+        join(sid)
+        host.post(f'/api/h/{sid}/settings', json={'timer': 15})
+        host.post(f'/api/h/{sid}/start', json={})
+        clock['now'] += 16
+        hstate(host, sid)
+        clock['now'] += 16
+        assert hstate(host, sid)['status'] == 'finished'
+
+    def test_pause_stops_timer(self, host, clock):
+        sid = create(host)['session_id']
+        short_questions(sid)
+        join(sid)
+        host.post(f'/api/h/{sid}/settings', json={'timer': 30})
+        host.post(f'/api/h/{sid}/start', json={})
+        clock['now'] += 10
+        host.post(f'/api/h/{sid}/pause', json={})
+        clock['now'] += 100
+        s = hstate(host, sid)
+        assert s['current'] == 0 and s['paused'] and s['time_left'] == 20
+        host.post(f'/api/h/{sid}/resume', json={})
+        assert hstate(host, sid)['time_left'] == 20
+
+    def test_teacher_can_always_advance_and_finish(self, host):
+        sid = create(host)['session_id']
+        short_questions(sid, 2)
+        join(sid)
+        host.post(f'/api/h/{sid}/start', json={})
+        host.post(f'/api/h/{sid}/next', json={'from_index': 0})
+        r = host.post(f'/api/h/{sid}/next', json={'from_index': 1})   # last question, nobody answered
+        assert r.status_code == 200 and r.get_json()['status'] == 'finished'
+
+    def test_double_click_next_skips_only_one(self, host):
+        sid = create(host)['session_id']
+        short_questions(sid, 5)
+        join(sid)
+        host.post(f'/api/h/{sid}/start', json={})
+        host.post(f'/api/h/{sid}/next', json={'from_index': 0})
+        host.post(f'/api/h/{sid}/next', json={'from_index': 0})
+        assert hstate(host, sid)['current'] == 1
+
+    def test_back_holds_auto_advance(self, host, clock):
+        sid = create(host)['session_id']
+        short_questions(sid)
+        a, _ = join(sid)
+        host.post(f'/api/h/{sid}/start', json={})
+        answer(a, sid, 0)
+        clock['now'] += appmod.AUTO_ADVANCE_GRACE + 0.1
+        assert hstate(host, sid)['current'] == 1
+        host.post(f'/api/h/{sid}/back', json={})
+        clock['now'] += 10
+        s = hstate(host, sid)
+        assert s['current'] == 0 and s['auto_held']
+        assert state(a, sid)['me']['answer'] == 'agree'
+
+    def test_finish_and_reopen(self, host):
+        sid = create(host)['session_id']
+        short_questions(sid)
+        join(sid)
+        host.post(f'/api/h/{sid}/start', json={})
+        host.post(f'/api/h/{sid}/finish', json={})
+        assert hstate(host, sid)['status'] == 'finished'
+        host.post(f'/api/h/{sid}/back', json={})
+        s = hstate(host, sid)
+        assert s['status'] == 'active' and s['current'] == 2
+
+    def test_reset_keeps_people_clears_answers(self, host):
+        sid = create(host)['session_id']
+        c, me = join(sid)
+        join(sid)
+        host.post(f'/api/h/{sid}/start', json={})
+        answer(c, sid, 0)
+        host.post(f'/api/h/{sid}/reset', json={})
+        s = state(c, sid)
+        assert s['status'] == 'waiting' and s['me']['pid'] == me['pid'] and s['me']['score'] == 0
+
+    def test_late_joiner(self, host):
+        sid = create(host)['session_id']
+        short_questions(sid)
+        join(sid)
+        join(sid)
+        host.post(f'/api/h/{sid}/start', json={})
+        host.post(f'/api/h/{sid}/next', json={'from_index': 0})
+        late, _ = join(sid)
+        s = state(late, sid)
+        assert s['question']['index'] == 1
+        assert answer(late, sid, 1).status_code == 200
+
+    def test_rankings_share_ties(self, host):
+        sid = create(host)['session_id']
+        short_questions(sid)
+        a, _ = join(sid)
+        b, _ = join(sid)
+        c, _ = join(sid)
+        host.post(f'/api/h/{sid}/start', json={})
+        answer(a, sid, 0, 'agree')
+        answer(b, sid, 0, 'agree')
+        answer(c, sid, 0, 'disagree')
+        assert state(a, sid)['me']['rank'] == 1
+        assert state(b, sid)['me']['rank'] == 1
+        assert state(c, sid)['me']['rank'] == 3
+
+    def test_export_csv(self, host):
+        sid = create(host)['session_id']
+        short_questions(sid)
+        a, me = join(sid)
+        join(sid)
+        host.post(f'/api/h/{sid}/start', json={})
+        answer(a, sid, 0)
+        body = host.get(f'/api/h/{sid}/export.csv').get_data(as_text=True)
+        assert body.splitlines()[0] == 'alias,score,Q1,Q2,Q3'
+        assert f"{me['alias']},1,agree,," in body
+
+
+class TestPersistence:
+    def test_save_and_load_roundtrip(self, host, tmp_path, monkeypatch):
+        monkeypatch.setattr(appmod, 'DATA_FILE', str(tmp_path / 'sessions.json'))
+        sid = create(host)['session_id']
+        c, me = join(sid)
+        host.post(f'/api/h/{sid}/start', json={})
+        answer(c, sid, 0)
+        appmod.save_sessions_to_file()
+        active_sessions.clear()
+        appmod._token_index.clear()
+        appmod.load_sessions_from_file()
+        s = state(c, sid)
+        assert s['me']['pid'] == me['pid'] and s['me']['answer'] == 'agree'
+
+    def test_corrupt_file_is_moved_aside(self, tmp_path, monkeypatch):
+        path = tmp_path / 'sessions.json'
+        path.write_text('{not json')
+        monkeypatch.setattr(appmod, 'DATA_FILE', str(path))
+        appmod.load_sessions_from_file()
+        assert active_sessions == {}
+        assert (tmp_path / 'sessions.json.corrupt').exists()
+
+    def test_cleanup_old_sessions(self, host, clock):
+        sid = create(host)['session_id']
+        _, me = join(sid)
+        clock['now'] += appmod.SESSION_TTL + 1
+        assert appmod.cleanup_old_sessions() == 1
+        assert sid not in active_sessions and me['token'] not in appmod._token_index
+
+
+class TestOps:
+    def test_health(self, host):
+        create(host)
+        data = host.get('/health').get_json()
+        assert data['status'] == 'healthy' and data['active_sessions'] == 1
+
+    def test_unknown_session_api(self, host):
+        r = host.get('/api/s/nope/state')
+        assert r.status_code == 404 and r.get_json()['gone']
+
+    def test_api_responses_not_cached(self, host):
+        sid = create(host)['session_id']
+        assert host.get(f'/api/s/{sid}/state').headers['Cache-Control'] == 'no-store'
+
+
+class TestStragglers:
+    def test_silent_but_connected_students_do_not_block(self, host, clock):
+        sid = create(host)['session_id']
+        short_questions(sid)
+        devices = [join(sid)[0] for _ in range(8)]
+        host.post(f'/api/h/{sid}/start', json={})
+        for c in devices[:5]:
+            answer(c, sid, 0)
+        assert hstate(host, sid)['time_left'] is None          # 5/8 < 75%
+        answer(devices[5], sid, 0)                              # 6/8 = 75%
+        s = hstate(host, sid)
+        assert s['straggler_countdown'] and s['current'] == 0
+        clock['now'] += 10
+        for c in devices[6:]:
+            state(c, sid)                                       # still connected, not answering
+        assert hstate(host, sid)['time_left'] == 10
+        clock['now'] += 11
+        assert hstate(host, sid)['current'] == 1
+
+    def test_straggler_wait_can_be_disabled(self, host, clock):
+        sid = create(host)['session_id']
+        short_questions(sid)
+        devices = [join(sid)[0] for _ in range(4)]
+        host.post(f'/api/h/{sid}/settings', json={'straggler_wait': 0})
+        host.post(f'/api/h/{sid}/start', json={})
+        for c in devices[:3]:
+            answer(c, sid, 0)
+        for _ in range(5):
+            clock['now'] += 10
+            state(devices[3], sid)
+        assert hstate(host, sid)['current'] == 0
+
+
+def test_class_sized_groups_get_distinct_emoji(host):
+    sid = create(host)['session_id']
+    emoji = [join(sid)[1]['emoji'] for _ in range(len(appmod.ANIMALS))]
+    assert len(set(emoji)) == len(appmod.ANIMALS)
