@@ -192,7 +192,7 @@ class TestIdentity:
 
 
 class TestAnswers:
-    def test_answer_is_idempotent_and_locked(self, host):
+    def test_answer_is_idempotent_and_changeable(self, host):
         sid = create(host)['session_id']
         c, _ = join(sid)
         join(sid)  # second student so the walk doesn't auto-advance
@@ -200,10 +200,22 @@ class TestAnswers:
         for _ in range(3):
             assert answer(c, sid, 0, 'agree').status_code == 200
         assert state(c, sid)['me']['score'] == 1
-        r = answer(c, sid, 0, 'disagree')
-        assert r.get_json()['answer'] == 'agree'
+        assert answer(c, sid, 0, 'disagree').get_json()['answer'] == 'disagree'
         s = state(c, sid)
-        assert s['me']['score'] == 1 and s['me']['answer'] == 'agree'
+        assert s['me']['score'] == -1 and s['me']['answer'] == 'disagree'
+
+    def test_change_after_question_closed_does_not_touch_next_question(self, host):
+        sid = create(host)['session_id']
+        short_questions(sid)
+        c, _ = join(sid)
+        join(sid)
+        host.post(f'/api/h/{sid}/start', json={})
+        answer(c, sid, 0, 'agree')
+        host.post(f'/api/h/{sid}/next', json={'from_index': 0})
+        # Phone still showing question 1 tries to change its answer.
+        assert answer(c, sid, 0, 'disagree').status_code == 409
+        s = state(c, sid)
+        assert s['question']['index'] == 1 and s['me']['answer'] is None and s['me']['score'] == 1
 
     def test_stale_answer_rejected(self, host):
         sid = create(host)['session_id']

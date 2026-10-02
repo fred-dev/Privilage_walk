@@ -712,9 +712,9 @@ def api_answer(s):
         # Stale answer (question moved on while offline): tell the client the
         # real state instead of recording it against the wrong question.
         return api_error('That question is no longer open.', 409, stale=True, **question_payload(s, now()))
-    # First answer wins: retries and double taps are harmless, and an answer
-    # can't be changed once given.
-    answer = p['answers'].setdefault(str(index), answer)
+    # Keyed by question: retries and double taps are harmless, and a change
+    # of mind replaces the answer for this question only.
+    p['answers'][str(index)] = answer
     s['last_activity'] = now()
     mark_dirty()
     tick(s)

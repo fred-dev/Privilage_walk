@@ -26,8 +26,10 @@ or use the teacher link on another device.
   page (or rescan the QR code) and are the same person, with their answers intact.
 - If they switch device or clear their browser, they enter the 4-character **rejoin code** shown on their screen.
 - Answers given while offline are kept on the phone and sent automatically when the connection returns.
-  An answer is locked once given (a retry or a double tap never counts twice), and the buttons stay
-  locked for a moment when a new question appears so a late tap cannot land on the wrong question.
+  Students can change their answer while the question is open. Every tap is tied to the question shown on
+  their screen, so a change made just as the teacher moves on is refused, never applied to the next
+  question. A retry or a double tap never counts twice, and the buttons pause for a moment when a new
+  question appears.
 
 ## Nobody gets stuck waiting
 

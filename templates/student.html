@@ -289,7 +289,11 @@
 
             const chosen = pending ? pending.answer : m.answer;
             const settling = Date.now() < unlockAt;
-            const locked = state.paused || !!chosen || settling || needFresh;
+            // Answered students may change their mind, but only while this
+            // question is still the one on screen (every tap is sent with the
+            // number of the question shown, and the server refuses it once
+            // that question has closed).
+            const locked = state.paused || settling || needFresh;
             const answers = $('answers');
             answers.classList.toggle('chosen', !!chosen);
             answers.classList.toggle('locked', locked);
@@ -306,7 +310,7 @@
                 status.textContent = 'Sending your answer...';
                 status.classList.add('sending');
             } else if (m.answer) {
-                status.textContent = `✓ Saved: ${m.answer === 'agree' ? 'Agree' : 'Disagree'}. Wait for the next question.`;
+                status.textContent = `✓ Saved: ${m.answer === 'agree' ? 'Agree' : 'Disagree'} for question ${q.number}. Tap the other to change it.`;
                 status.classList.add('saved');
             } else if (needFresh) {
                 status.textContent = 'Checking for the latest question...';
@@ -353,8 +357,10 @@
         $('answers').addEventListener('click', (e) => {
             const btn = e.target.closest('.answer');
             if (!btn || btn.disabled || !state || !state.question) return;
-            if (pending || state.me.answer || needFresh || Date.now() < unlockAt) return;
+            if (needFresh || Date.now() < unlockAt) return;
             if (state.question.index !== shownIndex) return;
+            const current = pending ? pending.answer : state.me.answer;
+            if (current === btn.dataset.answer) return;
             setPending({ index: state.question.index, answer: btn.dataset.answer });
             PW.keepAwake(true);
             renderQuestion();
@@ -377,10 +383,12 @@
                     state.me.score = r.data.score;
                 }
                 render();
+                // They changed their mind while the first tap was sending.
+                if (pending && pending !== p && pending.index === p.index) sendAnswer();
                 poller.kick();
             } else if (r.status === 409) {
                 if (pending === p) setPending(null);
-                banner('That question closed before your answer arrived.', false);
+                banner('That question had already closed, so your answer was not saved.', false);
                 setTimeout(() => banner(''), 4000);
                 poller.kick();
             } else if (r.status === 401) {
