@@ -53,6 +53,9 @@
         .answers.chosen .answer { opacity: 0.45; }
         .answers.chosen .answer.selected { opacity: 1; border-color: #222; }
         .answer:disabled { cursor: not-allowed; }
+        .answers.locked:not(.chosen) .answer { opacity: 0.35; }
+        @keyframes newq { from { background: #fff3cd; } to { background: transparent; } }
+        .qtext.fresh { animation: newq 1.5s ease-out; border-radius: 10px; }
         .answer-status { margin-top: 1rem; min-height: 1.5em; font-weight: 600; color: #555; }
         .answer-status.saved { color: #198754; }
         .answer-status.sending { color: #856404; }
@@ -165,6 +168,17 @@
         let gone = false;
         let lastOkAt = Date.now();
         let localTimeLeft = null;
+        // Buttons stay locked for a moment after a new question appears, and
+        // after the phone wakes up until fresh data arrives, so a tap meant
+        // for the previous screen can never land on a different question.
+        const NEW_QUESTION_DELAY = 1500;
+        let shownIndex = null;
+        let unlockAt = 0;
+        let unlockTimer = null;
+        let needFresh = false;
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) { needFresh = true; if (state && state.question) renderQuestion(); }
+        });
 
         const $ = (id) => document.getElementById(id);
         const VIEWS = ['loadingView', 'joinView', 'lobbyView', 'questionView', 'finishedView', 'goneView'];
@@ -199,6 +213,7 @@
                 return false;
             }
             lastOkAt = Date.now();
+            needFresh = false;
             banner('');
             state = r.data;
             if (state.me) saveIdentity(state.me);
@@ -258,14 +273,29 @@
             const q = state.question, m = state.me;
             if (pending && pending.index !== q.index) setPending(null); // question moved on
             $('qNum').textContent = `Question ${q.number} of ${state.total_questions}`;
-            $('qText').textContent = q.text;
+            const qText = $('qText');
+            if (q.index !== shownIndex) {
+                // A different question is now on screen: highlight it and hold
+                // the buttons briefly so the student reads it before answering.
+                shownIndex = q.index;
+                qText.textContent = q.text;
+                qText.classList.remove('fresh');
+                void qText.offsetWidth; // restart the animation
+                qText.classList.add('fresh');
+                unlockAt = Date.now() + NEW_QUESTION_DELAY;
+                clearTimeout(unlockTimer);
+                unlockTimer = setTimeout(() => { if (state && state.question) renderQuestion(); }, NEW_QUESTION_DELAY + 50);
+            }
 
             const chosen = pending ? pending.answer : m.answer;
+            const settling = Date.now() < unlockAt;
+            const locked = state.paused || !!chosen || settling || needFresh;
             const answers = $('answers');
             answers.classList.toggle('chosen', !!chosen);
+            answers.classList.toggle('locked', locked);
             answers.querySelectorAll('.answer').forEach(b => {
                 b.classList.toggle('selected', b.dataset.answer === chosen);
-                b.disabled = state.paused;
+                b.disabled = locked;
             });
 
             const status = $('answerStatus');
@@ -276,8 +306,12 @@
                 status.textContent = 'Sending your answer...';
                 status.classList.add('sending');
             } else if (m.answer) {
-                status.textContent = `✓ Saved: ${m.answer === 'agree' ? 'Agree' : 'Disagree'} (tap the other to change)`;
+                status.textContent = `✓ Saved: ${m.answer === 'agree' ? 'Agree' : 'Disagree'}. Wait for the next question.`;
                 status.classList.add('saved');
+            } else if (needFresh) {
+                status.textContent = 'Checking for the latest question...';
+            } else if (settling) {
+                status.textContent = 'New question. Read it, then answer.';
             } else {
                 status.textContent = 'Tap Agree or Disagree';
             }
@@ -319,8 +353,8 @@
         $('answers').addEventListener('click', (e) => {
             const btn = e.target.closest('.answer');
             if (!btn || btn.disabled || !state || !state.question) return;
-            const current = pending ? pending.answer : state.me.answer;
-            if (current === btn.dataset.answer && !pending) return;
+            if (pending || state.me.answer || needFresh || Date.now() < unlockAt) return;
+            if (state.question.index !== shownIndex) return;
             setPending({ index: state.question.index, answer: btn.dataset.answer });
             PW.keepAwake(true);
             renderQuestion();
@@ -339,11 +373,10 @@
             if (r.ok) {
                 if (pending === p) setPending(null);
                 if (state && state.me && state.question && state.question.index === p.index) {
-                    state.me.answer = p.answer;
+                    state.me.answer = r.data.answer;
                     state.me.score = r.data.score;
                 }
                 render();
-                if (pending) sendAnswer(); // they changed their mind while sending
                 poller.kick();
             } else if (r.status === 409) {
                 if (pending === p) setPending(null);
